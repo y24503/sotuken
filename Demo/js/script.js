@@ -517,94 +517,130 @@ let battleState = {
         document.getElementById('battle-gauge1').style.width = '100%'; // ゲージを100%に
         document.getElementById('battle-gauge2').style.width = '100%';
         document.getElementById('battle-timer').textContent = `00:${String(timeLimit).padStart(2,'0')}`;
-        document.getElementById('battle-instruct').textContent = 'バトル開始ボタンを押してください';
-        document.getElementById('battle-mouse').classList.add('hidden'); // 連打エリアは隠す
-        document.getElementById('battle-start-btn').classList.remove('hidden'); // スタートボタンを表示
-    
-        // --- スタートボタンのクリックイベント ---
-        document.getElementById('battle-start-btn').onclick = () => {
-            document.getElementById('battle-start-btn').classList.add('hidden'); // スタートボタンを隠す
-            document.getElementById('battle-mouse').classList.remove('hidden'); // 連打エリアを表示
-            document.getElementById('battle-instruct').textContent = '1Pは連打！';
-            isBattleActive = true; // 連打受付開始
-            phase = 1; // 1Pのターン
-            timer = timeLimit; // タイマーリセット
-            document.getElementById('battle-timer').textContent = `00:${String(timer).padStart(2,'0')}`;
-    
-            // 1秒ごとにタイマーを減らす
-            intervalId = setInterval(() => {
-                timer--; // 1秒減らす
-                document.getElementById('battle-timer').textContent = `00:${String(timer).padStart(2,'0')}`;
-    
-                // --- 1Pのターン終了 ---
-                if (timer <= 0) {
-                    clearInterval(intervalId); // 1Pのタイマー停止
-                    isBattleActive = false; // 連打受付停止
-                    document.getElementById('battle-mouse').classList.add('hidden'); // 連打エリアを隠す
-    
-                    if (phase === 1) { // 1Pのターンだった場合
-                        // --- 2P連打へ移行 ---
-                        phase = 2; // 2Pのターン
-                        timer = timeLimit; // タイマーリセット
-                        document.getElementById('battle-timer').textContent = `00:${String(timer).padStart(2,'0')}`;
-                        document.getElementById('battle-instruct').textContent = '2Pは連打！';
-                        document.getElementById('battle-mouse').classList.remove('hidden'); // 連打エリアを再表示
-                        isBattleActive = true; // 連打受付再開
-    
-                        // 2Pのタイマー開始
-                        intervalId = setInterval(() => {
-                            timer--;
-                            document.getElementById('battle-timer').textContent = `00:${String(timer).padStart(2,'0')}`;
-    
-                            // --- 2Pのターン終了（バトル終了） ---
-                            if (timer <= 0) {
-                                clearInterval(intervalId); // 2Pタイマー停止
-                                isBattleActive = false; // 連打受付終了
-                                document.getElementById('battle-mouse').classList.add('hidden'); // 連打エリアを隠す
-                                
-                                // --- 勝敗判定 ---
-                                // P1へのダメージ = P2のクリック数 * 1000
-                                let damage1 = clickCount2 * 1000;
-                                // P2へのダメージ = P1のクリック数 * 1000
-                                let damage2 = clickCount1 * 1000;
-                                // 最終スコア（HP）を計算（0未満にならないように Math.max を使用）
-                                let final1 = Math.max(0, player1.score - damage1);
-                                let final2 = Math.max(0, player2.score - damage2);
-                                
-                                // 最終スコアとゲージを更新
-                                document.getElementById('battle-score1').textContent = `${final1}/${player1.maxScore}`;
-                                document.getElementById('battle-score2').textContent = `${final2}/${player2.maxScore}`;
-                                document.getElementById('battle-gauge1').style.width = `${(final1 / player1.maxScore) * 100}%`;
-                                document.getElementById('battle-gauge2').style.width = `${(final2 / player2.maxScore) * 100}%`;
-                                
-                                // 勝敗メッセージを表示
-                                if (final1 > final2) {
-                                    document.getElementById('battle-instruct').textContent = '1Pの勝ち！';
-                                } else if (final2 > final1) {
-                                    document.getElementById('battle-instruct').textContent = '2Pの勝ち！';
-                                } else {
-                                    document.getElementById('battle-instruct').textContent = '引き分け！';
-                                }
-                                // (注: この後、結果画面 #screen-battle-result へ自動遷移するロジックはここにはない)
-                                // (showBattleResult 関数は別途呼び出す必要がある)
-                            }
-                        }, 1000); // 1秒ごと
-                    }
-                }
-            }, 1000); // 1秒ごと
-        };
-    
-        // --- 連打エリアのクリックイベント ---
-        document.getElementById('battle-mouse').onclick = function() {
-            if (!isBattleActive) return; // 連打受付中じゃなければ何もしない
-            if (phase === 1) {
-                clickCount1++; // 1Pのターンなら P1のカウントを増やす
-            } else if (phase === 2) {
-                clickCount2++; // 2Pのターンなら P2のカウントを増やす
-            }
-        };
-    
-        // --- バトル画面のEXIT（戻る）ボタン ---
+      document.getElementById('battle-instruct').textContent = 'バトル開始ボタンを押してください';
+        document.getElementById('battle-mouse').classList.add('hidden'); // 連打エリアは隠す
+        document.getElementById('battle-start-btn').classList.remove('hidden'); // １Pスタートボタンを表示
+        document.getElementById('battle-start-btn-2p').classList.add('hidden'); // ２Pスタートボタンを隠す
+        document.getElementById('click-counter').textContent = 'クリック数: 0'; // クリック数をリセット        // --- 1P用スタートボタンのクリックイベント ---
+        document.getElementById('battle-start-btn').onclick = () => {
+            document.getElementById('battle-start-btn').classList.add('hidden'); // スタートボタンを隠す
+            document.getElementById('battle-mouse').classList.remove('hidden'); // 連打エリアを表示
+            document.getElementById('battle-instruct').textContent = '1Pは連打！';
+            isBattleActive = true; // 連打受付開始
+            phase = 1; // 1Pのターン
+            timer = timeLimit; // タイマーリセット
+            clickCount1 = 0; // 1Pクリック数リセット
+            document.getElementById('click-counter').textContent = 'クリック数: 0';
+            document.getElementById('battle-timer').textContent = `00:${String(timer).padStart(2,'0')}`;
+
+            // 1秒ごとにタイマーを減らす
+            intervalId = setInterval(() => {
+                timer--; // 1秒減らす
+                document.getElementById('battle-timer').textContent = `00:${String(timer).padStart(2,'0')}`;
+
+                // --- 1Pのターン終了 ---
+                if (timer <= 0) {
+                    clearInterval(intervalId); // 1Pのタイマー停止
+                    isBattleActive = false; // 連打受付停止
+                    document.getElementById('battle-mouse').classList.add('hidden'); // 連打エリアを隠す
+
+                    if (phase === 1) { // 1Pのターンだった場合
+                        // --- 2P連打へ移行準備 ---
+                        phase = 2; // 2Pのターン
+                        timer = timeLimit; // タイマーリセット
+                        document.getElementById('battle-timer').textContent = `00:${String(timer).padStart(2,'0')}`;
+                        document.getElementById('battle-instruct').textContent = '２Pのターンです。STARTボタンを押してください！';
+                        document.getElementById('battle-start-btn-2p').classList.remove('hidden'); // ２Pスタートボタン表示
+                    }
+                }
+            }, 1000); // 1秒ごと
+        };
+
+        // --- 2P用スタートボタンのクリックイベント ---
+        document.getElementById('battle-start-btn-2p').onclick = () => {
+            document.getElementById('battle-start-btn-2p').classList.add('hidden'); // ２Pスタートボタンを隠す
+            document.getElementById('battle-mouse').classList.remove('hidden'); // 連打エリアを表示
+            document.getElementById('battle-instruct').textContent = '2Pは連打！';
+            isBattleActive = true; // 連打受付再開
+            clickCount2 = 0; // 2Pクリック数リセット
+            document.getElementById('click-counter').textContent = 'クリック数: 0';
+
+            // 2Pのタイマー開始
+            intervalId = setInterval(() => {
+                timer--;
+                document.getElementById('battle-timer').textContent = `00:${String(timer).padStart(2,'0')}`;
+
+                // --- 2Pのターン終了（バトル終了） ---
+                if (timer <= 0) {
+                    clearInterval(intervalId); // 2Pタイマー停止
+                    isBattleActive = false; // 連打受付終了
+                    document.getElementById('battle-mouse').classList.add('hidden'); // 連打エリアを隠す
+
+                    // --- 勝敗判定 ---
+                    // P1へのダメージ = P2のクリック数 * 1000
+                    let damage1 = clickCount2 * 1000;
+                    // P2へのダメージ = P1のクリック数 * 1000
+                    let damage2 = clickCount1 * 1000;
+                    // 最終スコア（HP）を計算（0未満にならないように Math.max を使用）
+                    let final1 = Math.max(0, player1.score - damage1);
+                    let final2 = Math.max(0, player2.score - damage2);
+
+                    // 最終スコアとゲージを更新
+                    document.getElementById('battle-score1').textContent = `${final1}/${player1.maxScore}`;
+                    document.getElementById('battle-score2').textContent = `${final2}/${player2.maxScore}`;
+                    document.getElementById('battle-gauge1').style.width = `${(final1 / player1.maxScore) * 100}%`;
+                    document.getElementById('battle-gauge2').style.width = `${(final2 / player2.maxScore) * 100}%`;
+
+                    // 勝敗メッセージを表示
+                    if (final1 > final2) {
+                        document.getElementById('battle-instruct').textContent = '1Pの勝ち！';
+                    } else if (final2 > final1) {
+                        document.getElementById('battle-instruct').textContent = '2Pの勝ち！';
+                    } else {
+                        document.getElementById('battle-instruct').textContent = '引き分け！';
+                    }
+                    // (注: この後、結果画面 #screen-battle-result へ自動遷移するロジックはここにはない)
+                    // (showBattleResult 関数は別途呼び出す必要がある)
+                }
+            }, 1000); // 1秒ごと
+        };        // --- 連打エリアのクリックイベント ---
+        document.getElementById('battle-mouse').onclick = function(event) {
+            if (!isBattleActive) return; // 連打受付中じゃなければ何もしない
+
+            // 波紋エフェクトを作成
+            createRippleEffect(event, this);
+
+            if (phase === 1) {
+                clickCount1++; // 1Pのターンなら P1のカウントを増やす
+                document.getElementById('click-counter').textContent = `クリック数: ${clickCount1}`;
+            } else if (phase === 2) {
+                clickCount2++; // 2Pのターンなら P2のカウントを増やす
+                document.getElementById('click-counter').textContent = `クリック数: ${clickCount2}`;
+            }
+        };
+
+        // 波紋エフェクトを作成する関数
+        function createRippleEffect(event, element) {
+            const rect = element.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+
+            const ripple = document.createElement('div');
+            ripple.className = 'ripple';
+            ripple.style.left = (x - 25) + 'px';
+            ripple.style.top = (y - 25) + 'px';
+            ripple.style.width = '50px';
+            ripple.style.height = '50px';
+
+            element.appendChild(ripple);
+
+            // アニメーション終了後に要素を削除
+            setTimeout(() => {
+                if (ripple.parentNode) {
+                    ripple.parentNode.removeChild(ripple);
+                }
+            }, 600);
+        }        // --- バトル画面のEXIT（戻る）ボタン ---
         document.getElementById('battle-exit').onclick = () => {
             clearInterval(intervalId); // バトルタイマーを強制停止
             showScreen('title'); // タイトル画面に戻る

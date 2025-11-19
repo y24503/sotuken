@@ -1,4 +1,22 @@
+/* --- ファイル全体の目的（詳細説明を追記） ---
+   このCSSはアプリ全体に適用される「ネオン風」テーマを定義します。
+   主に次の目的で構成されています：
+   1) 背景およびオーバーレイ：ページ全体のトーン（緑系ネオン）を決定
+   2) 共通UI要素（.btn, .card 等）：アプリ内の一貫した見た目を確保
+   3) スキャナ／HUD領域：カメラ映像と情報表示を重ねるためのレイアウト
+   4) レスポンシブ配慮：モバイル時に要素が重ならないように微調整
+
+   調整のヒント（開発者向け）：
+   - ネオンの色を変えるには --box-shadow と border の色を同時に変更してください（例：#00ff41 を別色に）。
+   - タイトルのアウトラインは text-shadow と -webkit-text-stroke の組み合わせで実現しています。太さを変えたい場合は text-shadow のオフセット値を調整。
+   - HUD の z-index は video/canvas より大きく設定されています。要素が隠れる場合は z-index を確認して下さい。
+   - ボタンの挙動は :hover で変化します。アニメーションを追加する場合は transition の値を変更してください。
+*/
+
 /* --- サイバー・ネオンサイエンス風全体デザイン --- */
+/* このファイルはアプリ全体のビジュアル（ネオン調）を定義します。
+   セクションごとに簡単な説明をコメントで追記しています。 */
+
 @font-face {
     font-family: 'FZGontaKana'; /* 任意のフォント名を指定 */
     /* ↓ フォントファイルへの正しいパスを指定してください */
@@ -7,6 +25,9 @@
     font-weight: normal;
     font-style: normal;
 }
+
+/* ----- ベースレイアウトと背景 ----- */
+/* body は背景グラデーション＋オーバーレイでネオン感を表現 */
 body {
     min-height: 100vh;
     background: linear-gradient(135deg, #0ee5b3 0%, #0ebd54 100%);
@@ -15,6 +36,7 @@ body {
     position: relative;
     overflow-x: hidden;
 }
+/* 薄い横線のオーバーレイ（スキャン目盛っぽく見せる） */
 body::before {
     content: '';
     position: fixed;
@@ -28,7 +50,15 @@ body::before {
     mix-blend-mode: lighten;
 }
 
-/* --- ボタン --- */
+/* --- ボタン共通スタイル（詳細説明） ---
+   .btn / .hud-button は以下の狙いで設計されています：
+   - 背景: グラデーションでメタリック感（黄金系）を表現
+   - 縁取り/影: ネオンの光源を表現するためにbox-shadowを多重で適用
+   - 可読性: -webkit-text-stroke による縁取りで文字が背景に負けないようにする
+   調整ポイント：
+   - フォントを変える場合は font-family を書き換える（日本語表示は Meiryo など推奨）
+   - ボタンの強調色を変更したい場合は背景グラデーションの色、および box-shadow の色を揃えて変更
+*/
 .btn, .hud-button {
     font-family: meiryo;
     background: linear-gradient(90deg, #f9c107 0%, #ff9900 100%);
@@ -45,7 +75,7 @@ body::before {
     position: relative;
     overflow: hidden;
 }
-
+/* hover で暗転してネオンだけ目立たせる */
 .btn:hover, .hud-button:hover {
     color: #fff;
     background: #101820;
@@ -64,7 +94,15 @@ body::before {
     box-shadow: 0 0 18px #00ff41;
 }
 
-/* --- パネル・カード --- */
+/* --- カード（.card）について（詳細） ---
+   .card は各画面の「パネル」要素に適用されます。
+   ポイント：
+   - 半透明背景(rgba)で背景色を暗くしつつ下層のオーバーレイを透過させる
+   - 線（border）と外側のネオンシャドウでホバー時に浮き上がる印象を作る
+   調整例：
+   - パディングを小さくするとコンパクトなカードになる
+   - max-width を増やすと広い画面でもカードが横に広がる
+*/
 .card {
     background: rgba(20,30,40,0.92);
     border: 2px solid #00ff41;
@@ -77,7 +115,14 @@ body::before {
     z-index: 1;
 }
 
-/* --- タイトル・見出しアニメーション --- */
+/* --- タイトル（#main-title / h1）の詳細 --- 
+   目的: アイキャッチとして強い印象を与える。
+   実装のポイント:
+   - 複数の text-shadow を重ねて太いアウトラインとドロップシャドウを表現
+   - -webkit-text-stroke でさらに縁取りを補強（ブラウザ互換を考慮）
+   カスタム案:
+   - アニメーションを弱めたい場合は animation の duration を伸ばすか無効化
+*/
 #main-title, h1 {
     font-family:  'FZGontaKana', 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; 
    /* 1. 文字の色 */
@@ -101,30 +146,24 @@ body::before {
     animation: neon-flicker 2.2s infinite alternate;
 }
 
+/* サブ見出しのスタイル（main-title と同系統） */
 #font-orbitron, h2, h3 {
     font-family: sans-serif;
-   /* 1. 文字の色 */
-   color: #ffd700; /* 鮮やかな黄色（Goldに近い色） */
-    
-   /* 2. 太い黒の縁 (text-shadowで再現) */
+   color: #ffd700;
    text-shadow: 
-       /* 縁取り (4方向の影を重ねることで太いアウトラインを作る) */
        -3px -3px 0 #000, 
         3px -3px 0 #000,
        -3px  3px 0 #000,
         3px  3px 0 #000,
-        
-       /* 3. 影（ドロップシャドウ）*/
-        5px  5px 0 #000, /* 影を右下に少しずらす */
-        6px  6px 5px rgba(0, 0, 0, 0.5); /* ぼかしを加えてより立体的に */
-        
-   /* WebKit系のブラウザ（Chrome, Safariなど）での縁取り */
+        5px  5px 0 #000,
+        6px  6px 5px rgba(0, 0, 0, 0.5);
    -webkit-text-stroke: 1px black;
     letter-spacing: 0.08em;
     animation: neon-flicker 2.2s infinite alternate;
 }
 
-/* --- スクロールバーもサイバー風に --- */
+/* --- スクロールバーの見た目調整 --- */
+/* カスタムスクロールバーでネオン感を維持 */
 ::-webkit-scrollbar {
     width: 10px;
     background: #101820;
@@ -134,6 +173,15 @@ body::before {
     border-radius: 8px;
 }
 
+/* --- スキャナ風コンテナ（.scouter-container）について（詳細） ---
+   この領域はカメラ映像（video）と描画レイヤー（canvas）、HUDを重ねて表示します。
+   注意点：
+   - canvas は pointer-events: none にしておくと下の video 操作が妨げられません。
+   - 映像のアスペクト比に合わせるため aspect-ratio を設定（16/9 推奨）
+   - 内部で絶対配置する要素（video, canvas, HUD）は位置と z-index に注意
+   調整ポイント：
+   - ボーダーや内側の光量（box-shadow）を変えると演出が大きく変わります
+*/
 .scouter-container {
     width: 90vw;
     max-width: 1200px;
@@ -164,6 +212,7 @@ body::before {
     align-items: center;
     justify-content: center;
 }
+/* video / canvas はコンテナに重ねて表示（canvas は描画用） */
 #input-video {
     width: 100%;
     height: 100%;
@@ -186,17 +235,32 @@ body::before {
     z-index: 2;
     pointer-events: none;
 }
+
+/* --- HUD（ヘッドアップディスプレイ）について（詳細） ---
+   HUD は映像上に情報を重ねて表示するためのレイヤーです。
+   実装上のルール:
+   - pointer-events: none を親に付与することで HUD 自体がクリックイベントを奪わない
+   - 個別の HUD ボタンだけ pointer-events を有効にする（.hud-button）
+   - readout-value 等は視認性のため大きめフォント＋テキストシャドウ
+   調整例:
+   - 右上のメインスコアの位置を変えたい場合は .hud-main-readout の top/right を変更
+*/
 .hud-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 20px; box-sizing: border-box; display: flex; flex-direction: column; pointer-events: none; z-index: 20; }
 .hud-top-bar { width: 100%; color: #00ff41; text-shadow: 0 0 5px #00ff41; }
 .status-box { font-size: 1rem; }
+/* 色名ユーティリティ（Tailwind互換風に一部指定） */
 .text-yellow-400 { color: #facc15 !important; }
 .text-green-400 { color: #4ade80 !important; }
 .text-red-500 { color: #ef4444 !important; }
+
+/* HUD主要表示部の見た目 */
 .hud-main-readout { position: absolute; top: 32px; right: 48px; text-align: right; }
 .readout-label { font-size: 1.1rem; letter-spacing: 0.05em; }
 .readout-value { font-size: 4.2rem; font-family: 'Orbitron', sans-serif; line-height: 1; text-shadow: 0 0 12px #00ff41, 0 0 32px #00ff41; }
 .hud-sub-readouts { position: absolute; bottom: 96px; right: 140px; text-align: right; font-size: 1.05rem; line-height: 1.7; }
 .hud-bottom-bar { margin-top: auto; width: 100%; position: relative; }
+
+/* HUDのグリッドライン（演出用） */
 .hud-grid-lines {
     width: 100%;
     height: 50px;
@@ -207,6 +271,8 @@ body::before {
     border-top: 2px solid #00ff41;
     box-shadow: 0 0 10px #00ff41;
 }
+
+/* HUDボタン（画面内に固定配置する小さなボタン） */
 .hud-button {
     position: absolute;
     bottom: 0;
@@ -226,13 +292,68 @@ body::before {
     background-color: rgba(0, 255, 65, 0.2);
     box-shadow: 0 0 18px #00ff41;
 }
-/* EXITを右下に固定 */
+/* EXIT は右下に固定したい場合に使うクラス */
 .hud-button.hud-exit {
     left: auto;
     right: 0;
 }
-/* 小画面で重なり回避 */
+
+/* モバイル向けにサイズ調整（小画面での重なり回避） */
 @media (max-width: 640px) {
   .hud-button { padding: 6px 18px; font-size: 0.95rem; }
     .hud-sub-readouts { bottom: 110px; right: 100px; font-size: 0.95rem; }
 }
+
+/* 連打エリアの波紋エフェクト */
+.ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,255,255,0.6) 0%, rgba(0,255,255,0.3) 30%, rgba(0,255,255,0) 70%);
+    transform: scale(0);
+    animation: ripple-effect 0.6s ease-out;
+    pointer-events: none;
+    z-index: 10;
+}
+
+@keyframes ripple-effect {
+    0% {
+        transform: scale(0);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(4);
+        opacity: 0;
+    }
+}
+
+/* 連打エリアのホバー効果 */
+#battle-mouse:hover {
+    background: linear-gradient(45deg, #4a5568 0%, #2d3748 100%);
+    box-shadow: 0 0 20px rgba(0,255,255,0.3);
+    transition: all 0.3s ease;
+}
+
+/* クリックカウンターのスタイル */
+#click-counter {
+    text-shadow: 0 0 10px #00ffff;
+    animation: pulse-glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes pulse-glow {
+    0% {
+        text-shadow: 0 0 10px #00ffff;
+    }
+    100% {
+        text-shadow: 0 0 20px #00ffff, 0 0 30px #00ffff;
+    }
+}
+
+/* --- レスポンシブ（モバイル）注意点 ---
+   - 小画面では HUD の位置やボタンのパディングを小さくすることで重なりを回避しています。
+   - もし独自UIを追加する場合は、必ず @media (max-width: 640px) セクションに追記して挙動を確認してください。
+*/
+
+/* --- 追記メモ ---
+   - 色やシャドウの値は見た目調整を想定しているため、実運用ではデザイン変数化（CSS変数）を導入するのが望ましいです。
+   - 例: :root { --neon: #00ff41; --accent: #ffd700; } として各所で参照するとメンテナンス性が向上します。
+*/
