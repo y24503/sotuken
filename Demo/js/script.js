@@ -5,6 +5,8 @@ let battleState = {
         player1: {}, // プレイヤー1のデータ（名前、スコア、画像パスなど）
         player2: {}  // プレイヤー2のデータ
     };
+// window にも公開して旧コードの参照を壊さない
+try { window.battleState = battleState; } catch(e){}
     
     // 画面切り替え（共通関数）
     // 指定されたscreenNameの画面（#screen-XXX）のみを表示し、他をすべて非表示にする
@@ -63,10 +65,19 @@ let battleState = {
         if (btnGotoRanking) {
             btnGotoRanking.onclick = () => showScreen('ranking'); // クリックでランキング画面へ
         }
-        const btnGoto2P = document.getElementById('btn-goto-2pmeasure'); // 「2Pたいせん」ボタン
-        if (btnGoto2P) {
-            btnGoto2P.onclick = () => showScreen('2pmeasure'); // クリックで2P対戦準備画面へ
-        }
+    const btnGoto2P = document.getElementById('btn-goto-2pmeasure'); // 「バトル」(2P) ボタン
+    if (btnGoto2P) {
+        btnGoto2P.onclick = () => {
+            // 2Pモード初期化して 1人目性別選択へ
+            battleState.mode = '2pmeasure';
+            battleState.step = 202; // P1性別選択 / 測定前
+            try {
+                sessionStorage.setItem('battleState', JSON.stringify(battleState));
+                sessionStorage.setItem('twoPlayerActive','1');
+            } catch(e){}
+            showScreen('2p-gender-1');
+        };
+    }
         
         // BGM（背景音楽）の初期化処理を呼び出す
         setupBGM();
@@ -93,14 +104,22 @@ let battleState = {
                 case 'btn-back-to-instructions': // gender（性別選択） -> instructions（説明）
                     showScreen('instructions'); // 説明画面に戻る
                     break;
-                case 'btn-2pmeasure-start': // 2人測定開始ボタン
-                    try { 
-                        startMeasurementFlow(); // 2人測定フロー（measurement.htmlへの遷移）を開始
-                    } catch (e) { 
-                        // エラー時はとりあえず測定画面（index.html内の）を表示
-                        showScreen('measurement'); 
-                    }
-                    break;
+            case 'btn-2pmeasure-start': // （旧）2人測定開始ボタン（互換）
+                // 現在は使わず、直接性別選択へ誘導
+                battleState.mode = '2pmeasure';
+                battleState.step = 202;
+                try {
+                    sessionStorage.setItem('battleState', JSON.stringify(battleState));
+                    sessionStorage.setItem('twoPlayerActive','1');
+                } catch(e){}
+                showScreen('2p-gender-1');
+                break;
+            case 'btn-2p-gender1-cancel': // 1人目性別選択キャンセル
+            case 'btn-2p-gender2-cancel': // 2人目性別選択キャンセル
+                battleState = { mode: null, step: 0, player1: {}, player2: {} };
+                try { sessionStorage.setItem('battleState', JSON.stringify(battleState)); } catch(e){}
+                showScreen('title');
+                break;
                 case 'btn-2pmeasure-exit': // 2人測定やめるボタン
                     showScreen('title'); // タイトル画面に戻る
                     break;
@@ -108,16 +127,34 @@ let battleState = {
     
             // --- 性別選択ボタン（gender-btn）の処理 ---
             // IDではなくクラス名で判定（男性・女性ボタン両方に対応）
-            if (target.classList && target.classList.contains('gender-btn')) {
-                // 選択した性別（'male' または 'female'）をグローバル変数に記録
-                try { window._selectedGender = target.dataset.gender || 'male'; } catch(e) {}
-                // 測定画面（index.html内の）を表示
-                showScreen('measurement');
-                // 単独測定開始（1P）
-                try { 
-                    showMeasurementUI(1); // 測定（measurement.htmlへの遷移）を開始
-                } catch(e) {}
-            }
+        if (target.classList && target.classList.contains('gender-btn')) {
+            const gender = target.dataset.gender || 'male';
+            const playerAttr = target.dataset.player; // 2P画面では data-player が付与
+            if (battleState.mode === '2pmeasure') {
+                if (battleState.step === 202) { // P1 性別選択
+                    battleState.player1 = battleState.player1 || {};
+                    battleState.player1.gender = gender;
+                    window._selectedGender = gender;
+                    battleState.step = 202; // 測定前P1（維持）
+                    try { sessionStorage.setItem('battleState', JSON.stringify(battleState)); } catch(e){}
+                    showMeasurementUI(1);
+                } else if (battleState.step === 203) { // P2 性別選択
+                    battleState.player2 = battleState.player2 || {};
+                    battleState.player2.gender = gender;
+                    window._selectedGender = gender;
+                    try { sessionStorage.setItem('battleState', JSON.stringify(battleState)); } catch(e){}
+                    showMeasurementUI(2);
+                } else {
+                    // フォールバック: 単独扱い
+                    window._selectedGender = gender;
+                    showMeasurementUI(1);
+                }
+            } else {
+                // 単独測定
+                window._selectedGender = gender;
+                showMeasurementUI(1);
+            }
+        }
         });
     
         // --- 測定結果（2人）から戻ってきたときの復帰処理 ---
@@ -126,9 +163,15 @@ let battleState = {
         try {
             // ブラウザの一時保存領域(sessionStorage)から 'battleState' を読み込む
             const raw = sessionStorage.getItem('battleState');
-            if (raw) { // データが存在する場合
-                const bs = JSON.parse(raw); // JSON文字列をオブジェクトに戻す
-                // 2P測定モードで、ステップが204（P2測定完了）で、両プレイヤーのデータが揃っているか確認
+        if (raw) { // データが存在する場合
+            const bs = JSON.parse(raw); // JSON文字列をオブジェクトに戻す
+            // P1測定完了後 (step=203) で P2性別未選択なら 2人目性別選択へ
+            if (bs && bs.mode === '2pmeasure' && bs.step === 203 && (!bs.player2 || !bs.player2.gender)) {
+                battleState = bs;
+                showScreen('2p-gender-2');
+                return;
+            }
+            // 2P測定モードで、ステップが204（P2測定完了）で、両プレイヤーのデータが揃っているか確認
                 if (bs && bs.mode === '2pmeasure' && bs.step === 204 && bs.player1 && bs.player2) {
                     // データをローカル変数に格納
                     const p1 = bs.player1;
@@ -165,12 +208,10 @@ let battleState = {
     function showMeasurementUI(playerNum) {
         // 測定画面を同一ページで表示する代わりに measurement.html を開く
         try {
-            // 現在の battleState（モードがnullか'2pmeasure'かなど）を sessionStorage に保存する
-            // これにより、遷移先の measurement.html が現在の状態を引き継げる
-            const bs = window.battleState || { mode: null, step: 0 };
-            sessionStorage.setItem('battleState', JSON.stringify(bs));
-            // ページを measurement.html に遷移させる (URLパラメータでプレイヤー番号を渡す)
-            window.location.href = `measurement.html?player=${encodeURIComponent(playerNum || 1)}`;
+        // 正しい battleState をそのまま保存する（window.battleState は let で未公開だったので利用しない）
+        sessionStorage.setItem('battleState', JSON.stringify(battleState));
+        const p = playerNum || 1;
+        window.location.href = `measurement.html?player=${encodeURIComponent(p)}`;
         } catch (e) {
             // エラー時も同様に遷移を試みる
             window.location.href = `measurement.html?player=${encodeURIComponent(playerNum || 1)}`;
@@ -189,15 +230,14 @@ let battleState = {
      * 2人測定フローを開始する（「2Pたいせん」準備画面の「START」ボタンで呼ばれる）
      */
     async function startMeasurementFlow() {
-        // 2人測定モードであることを明示
-        battleState.mode = '2pmeasure';
-        battleState.step = 202; // ステップを「P1計測中」に設定
-        // 状態を sessionStorage に保存して...
-        try {
-            sessionStorage.setItem('battleState', JSON.stringify(battleState));
-        } catch(e){}
-        // P1（1人目）の測定のために measurement.html へ遷移
-        window.location.href = 'measurement.html?player=1';
+        // 現在は直接 P1 性別選択画面へ
+        battleState.mode = '2pmeasure';
+        battleState.step = 202; // P1 性別選択 / 測定前
+        try {
+            sessionStorage.setItem('battleState', JSON.stringify(battleState));
+            sessionStorage.setItem('twoPlayerActive','1');
+        } catch(e){}
+        showScreen('2p-gender-1');
     }
     
     // (三種バトル用の関数は削除されています)
@@ -310,11 +350,11 @@ let battleState = {
                             score: p1,
                             maxScore: p1
                         }, {
-                            image: battleState.player2.image || 'img/player2.jpg',
-                            name: battleState.player2.name || 'PLAYER2',
-                            score: p2,
-                            maxScore: p2
-                        });
+                    image: battleState.player2.image || 'img/player2.jpg',
+                    name: battleState.player2.name || 'PLAYER2',
+                    score: p2,
+                    maxScore: p2
+                    });
                         return; // バトルに移るので処理を抜ける
                     }
                 } else {
