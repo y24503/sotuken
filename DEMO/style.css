@@ -30,7 +30,12 @@
 /* body は背景グラデーション＋オーバーレイでネオン感を表現 */
 body {
     min-height: 100vh;
-    background: linear-gradient(135deg, #0ee5b3 0%, #0ebd54 100%);
+    /* 変更: 単一画像を画面全体に表示する設定に変更 */
+    background-image: url(img/img.png);
+    background-repeat: no-repeat;      /* 繰り返しを無効化 */
+    background-size: cover;            /* 画面全体を覆う（アスペクト比を維持して拡大/トリミング） */
+    background-position: center top;   /* 中央寄せ（垂直方向は上寄せ） */
+    /* background-attachment: fixed; */ /* 必要ならコメントを外して背景を固定できます */
     font-family: sans-serif;
     color: #e0eaff;
     position: relative;
