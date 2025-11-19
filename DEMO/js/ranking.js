@@ -32,7 +32,7 @@ function renderRanking(rows) {
 		let imgHtml = `<div style="width:64px;height:48px;background:#071116;border-radius:6px;"></div>`;
 		if (row.image) {
 			const imgSrc = String(row.image).startsWith('data:') ? row.image : `src/${encodeURIComponent(row.image)}`;
-			imgHtml = `<img class="w-16 h-12 object-cover rounded-md" src="${imgSrc}" alt="thumb">`;
+			imgHtml = `<img class="w-16 h-12 object-cover rounded-md cursor-zoom-in" src="${imgSrc}" alt="thumb">`;
 		}
 		const name = escapeHtml(row.name || 'PLAYER');
 		const score = (typeof row.score === 'number') ? row.score.toLocaleString() : (row.score ? escapeHtml(row.score) : '0');
@@ -77,4 +77,39 @@ try { window.deleteRankingEntry = deleteRankingEntry; } catch(e) {}
 // DOM 準備ができたら読み込み
 window.addEventListener('DOMContentLoaded', () => {
 	fetchAndShowRanking();
+
+	// 画像クリックで拡大表示（イベント委譲）
+	if (rankingListEl) {
+		rankingListEl.addEventListener('click', (ev) => {
+			const img = ev.target && ev.target.tagName === 'IMG' ? ev.target : null;
+			if (!img) return;
+			const modal = document.getElementById('img-modal');
+			const modalImg = document.getElementById('img-modal-img');
+			if (!modal || !modalImg) return;
+			modalImg.src = img.src;
+			modal.classList.remove('hidden');
+			modal.classList.add('flex');
+		});
+	}
+
+	// モーダル閉じる（背景クリック・ボタン・Esc）
+	const modal = document.getElementById('img-modal');
+	const modalImg = document.getElementById('img-modal-img');
+	const modalClose = document.getElementById('img-modal-close');
+	function closeModal(){
+		if (!modal) return;
+		modal.classList.add('hidden');
+		modal.classList.remove('flex');
+		if (modalImg) modalImg.src = '';
+	}
+	if (modal) {
+		modal.addEventListener('click', (e) => {
+			// 画像以外の領域クリックで閉じる
+			if (e.target === modal) closeModal();
+		});
+	}
+	if (modalClose) modalClose.addEventListener('click', closeModal);
+	document.addEventListener('keydown', (e) => {
+		if (e.key === 'Escape') closeModal();
+	});
 });
