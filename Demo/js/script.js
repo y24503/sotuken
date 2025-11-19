@@ -630,7 +630,7 @@ try { window.battleState = battleState; } catch(e){}
     
     // ---- 効果音フォールバック: sfx/ が無い環境でも動くようにパスを補正 ----
     function initSfxFallback() {
-        const testUrl = 'sfx/button.mp3'; // テスト用のファイルパス
+        const testUrl = 'src/sfx/button.mp3'; // テスト用のファイルパス
         // HEADメソッドでファイルの存在確認だけを行う（ファイル本体はダウンロードしない）
         fetch(testUrl, { method: 'HEAD' }).then(res => {
             if (res.ok) return; // ファイルが存在すれば（sfx/ が使える）何もしない (Aプラン)
