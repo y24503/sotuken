@@ -62,7 +62,7 @@ const POWER_CONSTANTS = {
     weightReachInBase: 0.40,
     weightShoulderInBase: 0.35,
     weightLegInBase: 0.25,
-    genderMultiplier: { male: 1.00, female: 1.09 }
+    genderMultiplier: { male: 1.00, female: 1.10 }
 };
 
 // --- MediaPipe Pose 関連 ---
@@ -332,7 +332,7 @@ btnStart && btnStart.addEventListener('click', () => {
             // 10秒経過時点の戦闘力(lastCombatStats)は、updateStats関数によって既にグローバル変数に保存されている
         } catch(e){}
         
-        // 名前入力モーダルを表示
+        // 名前入力モーダルを表示
         nameModal.classList.remove('hidden');
         inputPlayerName.value = '';
         inputPlayerName.focus();
