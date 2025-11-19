@@ -26,6 +26,49 @@ const btnExit = document.getElementById('btn-back-to-title-2'); // 終了(EXIT)�
 let measureTimeout = null; // 測定タイマー (10秒カウントダウン用)
 let lastSnapshotDataUrl = null; // 最後に撮影したスナップショット (Data URL形式)
 let lastCombatStats = null; // 最後に計算された戦闘力データ
+let showLandmarks = false; // ランドマーク表示フラグ（反転機能は削除）
+const flipLandmarksHorizontally = true; // 画面上の体の向きとランドマークが逆の場合は true で左右反転描画
+
+// 骨格接続ペア (簡略版) MediaPipe Pose の代表的な接続
+const POSE_CONNECTIONS = [
+    [11,12],[11,13],[13,15],[12,14],[14,16], // 上半身腕
+    [11,23],[12,24],[23,24], // 腰
+    [23,25],[25,27],[27,29],[24,26],[26,28],[28,30] // 脚
+];
+
+function drawLandmarks(ctx, lm) {
+    if (!lm || lm.length === 0) return;
+    const w = ctx.canvas.width;
+    const h = ctx.canvas.height;
+    ctx.save();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#00ff80';
+    ctx.shadowColor = '#00ff80';
+    ctx.shadowBlur = 12;
+    POSE_CONNECTIONS.forEach(([a,b]) => {
+        const p = lm[a];
+        const q = lm[b];
+        if (!p || !q) return;
+        const px = (flipLandmarksHorizontally ? (1 - p.x) : p.x) * w;
+        const py = p.y * h;
+        const qx = (flipLandmarksHorizontally ? (1 - q.x) : q.x) * w;
+        const qy = q.y * h;
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(qx, qy);
+        ctx.stroke();
+    });
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#ffd700';
+    lm.forEach(p => {
+        const px = (flipLandmarksHorizontally ? (1 - p.x) : p.x) * w;
+        const py = p.y * h;
+        ctx.beginPath();
+        ctx.arc(px, py, 7, 0, Math.PI*2);
+        ctx.fill();
+    });
+    ctx.restore();
+}
 
 // --- ユーティリティ ---
 
@@ -212,12 +255,19 @@ async function initPose() {
         // draw simple video->canvas background
         try {
             const ctx = canvasEl.getContext('2d');
-            ctx.clearRect(0,0,canvasEl.width,canvasEl.height);
             if (videoEl && videoEl.videoWidth) {
                 if (canvasEl.width !== videoEl.videoWidth) canvasEl.width = videoEl.videoWidth;
                 if (canvasEl.height !== videoEl.videoHeight) canvasEl.height = videoEl.videoHeight;
+            }
+            ctx.clearRect(0,0,canvasEl.width,canvasEl.height);
+            ctx.save();
+            if (videoEl && videoEl.videoWidth) {
                 ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
             }
+            if (showLandmarks && results && results.poseLandmarks) {
+                drawLandmarks(ctx, results.poseLandmarks);
+            }
+            ctx.restore();
         } catch(e){}
         }
     });
@@ -348,6 +398,18 @@ btnExit && btnExit.addEventListener('click', () => {
     window.location.href = 'index.html'; // メインページに戻る
 });
 
+// ランドマーク表示トグル
+const toggleLmBtn = document.getElementById('toggle-landmarks');
+if (toggleLmBtn) {
+    // 再確認: クリック届いているかログ
+    toggleLmBtn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        showLandmarks = !showLandmarks;
+        toggleLmBtn.textContent = showLandmarks ? 'ON' : 'OFF';
+        console.log('[LANDMARK-TOGGLE] switched ->', showLandmarks);
+    });
+}
+
 // --- 保存API (サーバーへの送信) ---
 /**
  * 測定結果をサーバー (/api/save_score) に送信する
@@ -375,6 +437,8 @@ async function saveResultToDB(combatStats, imageDataUrl, name = 'PLAYER') {
                 if (preview) preview.src = `src/${encodeURIComponent(json.image)}`;
             } catch(e){}
         }
+        // 最近保存IDをハイライト用に保存
+        try { if (json && json.id) sessionStorage.setItem('recentSavedId', String(json.id)); } catch(e){}
         return json;
     } catch (e) {
         alert('保存に失敗しました');

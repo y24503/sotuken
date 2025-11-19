@@ -103,6 +103,8 @@ window.addEventListener('DOMContentLoaded', () => {
 		if (modalImg) modalImg.src = '';
 	}
 	if (modal) {
+		// ハイライトは一度表示したら消す（再訪時に残らないよう）
+		try { sessionStorage.removeItem('recentSavedId'); } catch(e){}
 		modal.addEventListener('click', (e) => {
 			// 画像以外の領域クリックで閉じる
 			if (e.target === modal) closeModal();

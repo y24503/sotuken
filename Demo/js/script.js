@@ -79,9 +79,7 @@ try { window.battleState = battleState; } catch(e){}
         };
     }
         
-        // BGM（背景音楽）の初期化処理を呼び出す
-        setupBGM();
-        // 効果音（SE）のフォールバック（代替処理）初期化を呼び出す
+        // 効果音（SE）のフォールバック（代替処理）初期化を呼び出す
         initSfxFallback();
     
         // --- グローバルクリック委譲（他画面のボタン反応を保証） ---
@@ -150,7 +148,12 @@ try { window.battleState = battleState; } catch(e){}
                     showMeasurementUI(1);
                 }
             } else {
-                // 単独測定
+                // 単独測定: 2P用の状態を明示的にクリアしてから測定へ
+                battleState = { mode: null, step: 0, player1: {}, player2: {} };
+                try {
+                    sessionStorage.removeItem('battleState');
+                    sessionStorage.removeItem('twoPlayerActive');
+                } catch(e){}
                 window._selectedGender = gender;
                 showMeasurementUI(1);
             }
@@ -425,68 +428,6 @@ try { window.battleState = battleState; } catch(e){}
             });
         }
     });
-    
-    // ---- BGM: music フォルダの mp3/ogg/wav を自動検出し、選択再生 ----
-    function setupBGM() {
-        // BGM操作用のUI要素を取得
-        const select = document.getElementById('bgm-select'); // 曲選択ドロップダウン
-        const btnPlay = document.getElementById('bgm-play'); // 再生ボタン
-        const btnStop = document.getElementById('bgm-stop'); // 停止ボタン
-        const player = document.getElementById('bgm-player'); // <audio> タグ本体
-        if (!select || !btnPlay || !btnStop || !player) return; // 必要な要素が揃っていなければ何もしない
-    
-        // サーバーのAPI（/api/music-list）からBGMのファイルリストを取得
-        fetch('/api/music-list')
-            .then(r => r.json()) // レスポンスをJSONとして解析
-            .then(json => {
-                if (!json || !Array.isArray(json.files)) return; // データが不正なら終了
-    
-                // ファイル名（bgm1.mp3, bgm2.mp3 ...）を数値順にソートする処理
-                const parsed = json.files.map((name) => {
-                    const m = name.match(/^bgm(\d+)\./i); // "bgm" + "数字" + "." のパターンにマッチ
-                    const order = m ? parseInt(m[1], 10) : Number.POSITIVE_INFINITY; // マッチしたら数値、しなければ無限大（一番後ろ）
-                    return { name, order }; // ファイル名と順序のオブジェクト
-                }).sort((a, b) => {
-                    if (a.order !== b.order) return a.order - b.order; // 数値でソート
-                    return a.name.localeCompare(b.name); // 数値が同じならファイル名でソート
-                });
-    
-                // ソートしたリストを <select> タグの <option> として追加
-                parsed.forEach(({ name, order }) => {
-                    const opt = document.createElement('option');
-                    opt.value = 'music/' + name; // valueは実際のファイルパス
-                    opt.textContent = isFinite(order) ? `BGM ${order}` : name; // 表示名は "BGM 1" またはファイル名
-                    select.appendChild(opt);
-                });
-    
-                // 既定選択: "bgm1.*" があれば、それを最初に選択状態にする
-                const preferred = parsed.find(p => isFinite(p.order) && p.order === 1);
-                if (preferred) {
-                    select.value = 'music/' + preferred.name;
-                }
-            })
-            .catch(() => {}); // リスト取得失敗時は何もしない
-    
-        // 再生ボタンのクリックイベント
-        btnPlay.addEventListener('click', async () => {
-            const url = select.value; // 選択中の曲のパスを取得
-            if (!url) return;
-            try {
-                player.src = url; // <audio> タグの再生ソースを設定
-                await player.play(); // 再生（非同期）
-            } catch (e) {
-                console.warn('BGM play error', e); // 再生エラーはコンソールに出力
-            }
-        });
-    
-        // 停止ボタンのクリックイベント
-        btnStop.addEventListener('click', () => {
-            try { 
-                player.pause(); // 一時停止
-                player.currentTime = 0; // 再生位置を最初に戻す
-            } catch(e) {}
-        });
-    }
     
     // ===== バトル結果表示 =====
     // (この関数は showBattleScreen の最後で呼ばれるのではなく、

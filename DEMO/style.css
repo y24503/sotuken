@@ -221,7 +221,7 @@ body::before {
     position: absolute;
     top: 0;
     left: 0;
-    z-index: 3;
+    z-index: 2; /* 下に配置してキャンバス上のランドマークを前面に */
     opacity: 0.9;
 }
 #output-canvas {
@@ -232,7 +232,7 @@ body::before {
     position: absolute;
     top: 0;
     left: 0;
-    z-index: 2;
+    z-index: 3; /* ビデオより前面に */
     pointer-events: none;
 }
 
@@ -248,6 +248,9 @@ body::before {
 .hud-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 20px; box-sizing: border-box; display: flex; flex-direction: column; pointer-events: none; z-index: 20; }
 .hud-top-bar { width: 100%; color: #00ff41; text-shadow: 0 0 5px #00ff41; }
 .status-box { font-size: 1rem; }
+/* ランドマークトグル専用: HUDが pointer-events:none なので直接有効化 */
+#toggle-landmarks { pointer-events: all; cursor: pointer; border: 1px solid #00ff41; }
+#toggle-landmarks:hover { background:#103020; }
 /* 色名ユーティリティ（Tailwind互換風に一部指定） */
 .text-yellow-400 { color: #facc15 !important; }
 .text-green-400 { color: #4ade80 !important; }
