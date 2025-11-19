@@ -148,7 +148,7 @@ body::before {
 
 /* サブ見出しのスタイル（main-title と同系統） */
 #font-orbitron, h2, h3 {
-    font-family: sans-serif;
+    font-family: arial black;
    color: #ffd700;
    text-shadow: 
        -3px -3px 0 #000, 
