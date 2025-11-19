@@ -393,47 +393,58 @@ btnNameOk && btnNameOk.addEventListener('click', async () => {
     const saveJson = await saveResultToDB(lastCombatStats || { total_power: POWER_CONSTANTS.baseline }, lastSnapshotDataUrl || '', name);
 
     // --- 2人測定モード (2pmeasure) の判定 ---
-    let bs = {}; // battleState
-    try { 
-        // index.html から引き継いだ sessionStorage を読み込む
-        bs = JSON.parse(sessionStorage.getItem('battleState') || '{}'); 
-    } catch(e){}
+    let bs = {}; // battleState
+    try {
+        bs = JSON.parse(sessionStorage.getItem('battleState') || '{}');
+    } catch(e){}
+    // 2Pフロー復旧: battleStateが欠落していて twoPlayerActive フラグがある場合再構築
+    if ((!bs || !bs.mode) && sessionStorage.getItem('twoPlayerActive') === '1') {
+        const q2 = getQueryParams();
+        const pnum = q2.player ? Number(q2.player) : 1;
+        bs = { mode: '2pmeasure', step: (pnum === 1 ? 202 : 203), player1: {}, player2: {} };
+    }
     
     const q = getQueryParams(); // URLから ?player=1 などを取得
     const playerNum = q.player ? Number(q.player) : 1; // 自分がP1かP2か
 
     // 2P対戦モードの場合
-    if (bs && bs.mode === '2pmeasure') {
+    if (bs && bs.mode === '2pmeasure') {
         // サーバーに保存された画像パス (src/...) があればそれ、なければDataURL
         const savedImgPath = (saveJson && saveJson.success && saveJson.image) ? `src/${saveJson.image}` : lastSnapshotDataUrl;
 
         // --- P1 の測定が完了した場合 ---
         // (ステップが202 (P1測定中) AND 自分がP1)
-        if (bs.step === 202 && playerNum === 1) {
-            // P1のデータを battleState に保存
-            bs.player1 = {
-                name: name || 'PLAYER1',
-                score: (lastCombatStats && lastCombatStats.total_power) || 0,
-                image: savedImgPath
-            };
+        if (bs.step === 202 && playerNum === 1) {
+            // P1の既存情報（genderなど）を維持しつつ測定結果を反映
+            const prev = bs.player1 || {};
+            bs.player1 = {
+                ...prev,
+                name: name || prev.name || 'PLAYER1',
+                score: (lastCombatStats && lastCombatStats.total_power) || prev.score || 0,
+                maxScore: (lastCombatStats && lastCombatStats.total_power) || prev.maxScore || ((lastCombatStats && lastCombatStats.total_power) || prev.score || 0),
+                image: savedImgPath || prev.image
+            };
             bs.step = 203; // ステップを「P2測定中」に進める
             // sessionStorage を更新
             sessionStorage.setItem('battleState', JSON.stringify(bs));
-            
-            // P2 の測定へ移動 (ページをリロードしてP2にする)
-            window.location.href = 'measurement.html?player=2';
+            // P2 測定前に 2人目性別選択画面へ戻る
+            window.location.href = 'index.html';
             return; // 処理終了
         }
         
         // --- P2 の測定が完了した場合 ---
         // (ステップが203 (P2測定中) AND 自分がP2)
-        if (bs.step === 203 && playerNum === 2) {
-            // P2のデータを battleState に保存
-            bs.player2 = {
-                name: name || 'PLAYER2',
-                score: (lastCombatStats && lastCombatStats.total_power) || 0,
-                image: (saveJson && saveJson.success && saveJson.image) ? `src/${saveJson.image}` : lastSnapshotDataUrl
-            };
+        if (bs.step === 203 && playerNum === 2) {
+            // P2の既存情報（genderなど）を維持しつつ測定結果を反映
+            const prev2 = bs.player2 || {};
+            const img2 = (saveJson && saveJson.success && saveJson.image) ? `src/${saveJson.image}` : lastSnapshotDataUrl;
+            bs.player2 = {
+                ...prev2,
+                name: name || prev2.name || 'PLAYER2',
+                score: (lastCombatStats && lastCombatStats.total_power) || prev2.score || 0,
+                maxScore: (lastCombatStats && lastCombatStats.total_power) || prev2.maxScore || ((lastCombatStats && lastCombatStats.total_power) || prev2.score || 0),
+                image: img2 || prev2.image
+            };
             bs.step = 204; // ステップを「両者測定完了」に進める
             // sessionStorage を更新
             sessionStorage.setItem('battleState', JSON.stringify(bs));
@@ -443,10 +454,10 @@ btnNameOk && btnNameOk.addEventListener('click', async () => {
             return; // 処理終了
         }
     
-    } else {
-        // 1P（単独）測定の場合: ランキングページへ遷移
-        window.location.href = 'ranking.html';
-    }
+    } else {
+        // 1P（単独）測定の場合のみランキングへ
+        window.location.href = 'ranking.html';
+    }
 });
 
 // Cancelボタン: モーダルを閉じるだけ
@@ -457,8 +468,21 @@ btnNameCancel && btnNameCancel.addEventListener('click', () => {
 // --- 初期化処理 ---
 // ページ読み込み完了時にカメラ起動とポーズ推定ループを開始
 window.addEventListener('DOMContentLoaded', async () => {
-    await openCamera(); // カメラ起動
-    await startPoseLoop(); // ポーズ推定ループ開始
+    // 2Pモードの場合は選択済み性別を反映
+    try {
+        const bs = JSON.parse(sessionStorage.getItem('battleState') || '{}');
+        const q = getQueryParams();
+        const playerNum = q.player ? Number(q.player) : 1;
+        if (bs && bs.mode === '2pmeasure') {
+            if (playerNum === 1 && bs.player1 && bs.player1.gender) {
+                window._selectedGender = bs.player1.gender;
+            } else if (playerNum === 2 && bs.player2 && bs.player2.gender) {
+                window._selectedGender = bs.player2.gender;
+            }
+        }
+    } catch(e){}
+    await openCamera();
+    await startPoseLoop();
 });
 
 // --- グローバル公開 ---

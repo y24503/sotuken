@@ -144,6 +144,42 @@
                 <button id="btn-back-to-instructions" class="btn btn-secondary">戻る</button>
             </div>
         </div>
+
+        <!-- 2P対戦: 1人目性別選択 -->
+        <div id="screen-2p-gender-1" class="screen hidden card space-y-6">
+            <h2 class="text-3xl font-bold text-center font-orbitron">1人目のタイプを選択</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <button class="gender-btn card text-center p-8 hover:bg-indigo-800 transition-colors duration-200" data-gender="male" data-player="1">
+                    <span class="text-6xl">🚹</span>
+                    <p class="text-2xl font-bold mt-4 font-sans">男性</p>
+                </button>
+                <button class="gender-btn card text-center p-8 hover:bg-pink-800 transition-colors duration-200" data-gender="female" data-player="1">
+                    <span class="text-6xl">🚺</span>
+                    <p class="text-2xl font-bold mt-4 font-sans">女性</p>
+                </button>
+            </div>
+            <div class="flex gap-4 justify-center pt-4">
+                <button id="btn-2p-gender1-cancel" class="btn btn-secondary">やめる</button>
+            </div>
+        </div>
+
+        <!-- 2P対戦: 2人目性別選択 -->
+        <div id="screen-2p-gender-2" class="screen hidden card space-y-6">
+            <h2 class="text-3xl font-bold text-center font-orbitron">2人目のタイプを選択</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <button class="gender-btn card text-center p-8 hover:bg-indigo-800 transition-colors duration-200" data-gender="male" data-player="2">
+                    <span class="text-6xl">🚹</span>
+                    <p class="text-2xl font-bold mt-4 font-sans">男性</p>
+                </button>
+                <button class="gender-btn card text-center p-8 hover:bg-pink-800 transition-colors duration-200" data-gender="female" data-player="2">
+                    <span class="text-6xl">🚺</span>
+                    <p class="text-2xl font-bold mt-4 font-sans">女性</p>
+                </button>
+            </div>
+            <div class="flex gap-4 justify-center pt-4">
+                <button id="btn-2p-gender2-cancel" class="btn btn-secondary">やめる</button>
+            </div>
+        </div>
 		
 	<!-- measurement HTML は別ファイルへ分離しました -->
 	
