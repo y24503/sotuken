@@ -148,18 +148,27 @@ body::before {
 
 /* サブ見出しのスタイル（main-title と同系統） */
 #font-orbitron, h2, h3 {
-    font-family: arial black;
-   color: #ffd700;
-   text-shadow: 
-       -3px -3px 0 #000, 
-        3px -3px 0 #000,
-       -3px  3px 0 #000,
-        3px  3px 0 #000,
-        5px  5px 0 #000,
-        6px  6px 5px rgba(0, 0, 0, 0.5);
-   -webkit-text-stroke: 1px black;
-    letter-spacing: 0.08em;
-    animation: neon-flicker 2.2s infinite alternate;
+ /* 1. フォントと文字色 */
+ font-family: arial black; /* フォントファミリー */
+ color: #ffd700;           /* 文字色（金色） */
+ letter-spacing: 0.08em;   /* 文字間隔は維持 */
+
+ /* 2. 輪郭（縁取り）の表現を text-shadow のみで統一 */
+ text-shadow: 
+     /* 輪郭：上下左右 3px の太さで黒のシャドウを指定 */
+     -3px -3px 0 #000, 
+      3px -3px 0 #000,
+     -3px  3px 0 #000,
+      3px  3px 0 #000,
+     
+     /* 3. 背景に落ちる影：右下に大きくずらし、ぼかしを追加 */
+      8px  8px 5px rgba(0, 0, 0, 0.5); /* 影を大きく離して重なりを回避 */
+
+ /* -webkit-text-stroke は text-shadow と重複するため削除または無効化 */
+ /* -webkit-text-stroke: 1px black; */ 
+ 
+ /* アニメーションはそのまま維持 */
+ animation: neon-flicker 2.2s infinite alternate;
 }
 
 /* --- スクロールバーの見た目調整 --- */
