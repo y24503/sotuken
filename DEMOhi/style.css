@@ -8,20 +8,8 @@
     font-style: normal;
 }
 body {
-    /* --- 背景画像を App/img 以下の画像に差し替え可能にする --- */
-    /* 使い方:
-       1) App/img に画像を置く（例: img/bg.jpg）
-       2) 既定で img/bg.jpg が使われます。
-       3) 別の画像を使いたい場合は index.html の body タグで CSS 変数を上書きします:
-          <body style="--bg-image: url('img/your-image.png')">...
-    */
-    --bg-image: url('img/bg.jpg'); /* デフォルト: App/img/bg.jpg */
     min-height: 100vh;
-    /* 複数背景: 先に画像、その後にグラデーション（フォールバック）を重ねる */
-    background-image: var(--bg-image), linear-gradient(135deg, #0ee5b3 0%, #0ebd54 100%);
-    background-size: cover, auto;
-    background-position: center center, 0 0;
-    background-repeat: no-repeat, repeat;
+    background: linear-gradient(135deg, #0ee5b3 0%, #0ebd54 100%);
     font-family: sans-serif;
     color: #e0eaff;
     position: relative;
@@ -110,6 +98,14 @@ body::before {
    -webkit-text-stroke: 1px black;
     letter-spacing: 0.08em;
     animation: neon-flicker 2.2s infinite alternate;
+    margin-top: -100px;
+}
+@keyframes neon-flicker {
+    0% { text-shadow: 0 0 8px #00ff41, 0 0 24px #0fffc1, 0 0 32px #00ff41; }
+    90% { text-shadow: 0 0 8px #00ff41, 0 0 24px #0fffc1, 0 0 32px #00ff41; }
+    92% { text-shadow: 0 0 2px #00ff41, 0 0 4px #0fffc1, 0 0 8px #00ff41; }
+    94% { text-shadow: 0 0 16px #00ff41, 0 0 32px #0fffc1, 0 0 64px #00ff41; }
+    100% { text-shadow: 0 0 8px #00ff41, 0 0 24px #0fffc1, 0 0 32px #00ff41; }
 }
 
 /* --- スクロールバーもサイバー風に --- */
@@ -183,7 +179,7 @@ body::before {
 .hud-main-readout { position: absolute; top: 32px; right: 48px; text-align: right; }
 .readout-label { font-size: 1.1rem; letter-spacing: 0.05em; }
 .readout-value { font-size: 4.2rem; font-family: 'Orbitron', sans-serif; line-height: 1; text-shadow: 0 0 12px #00ff41, 0 0 32px #00ff41; }
-.hud-sub-readouts { position: absolute; bottom: 96px; right: 140px; text-align: right; font-size: 1.05rem; line-height: 1.7; }
+.hud-sub-readouts { position: absolute; bottom: 32px; right: 48px; text-align: right; font-size: 1.05rem; line-height: 1.7; }
 .hud-bottom-bar { margin-top: auto; width: 100%; position: relative; }
 .hud-grid-lines {
     width: 100%;
@@ -208,35 +204,8 @@ body::before {
     transition: all 0.3s;
     pointer-events: all;
     box-shadow: 0 0 8px #00ff41;
-    z-index: 30;
 }
 .hud-button:hover {
     background-color: rgba(0, 255, 65, 0.2);
     box-shadow: 0 0 18px #00ff41;
-}
-/* EXITを右下に固定 */
-.hud-button.hud-exit {
-    left: auto;
-    right: 0;
-}
-/* 小画面で重なり回避 */
-@media (max-width: 640px) {
-  .hud-button { padding: 6px 18px; font-size: 0.95rem; }
-    .hud-sub-readouts { bottom: 110px; right: 100px; font-size: 0.95rem; }
-}
-
-/* レスポンシブ: 小画面では画像を切らずに表示するため contain を使う */
-@media (max-width: 900px) {
-    body {
-        /* 背景画像の高さをビューポートに合わせて常に下まで届かせる（横幅は自動調整） */
-        /* これにより画像の縦方向が常にカバーされ、上下に黒い余白が出にくくなる */
-        background-size: auto 100%, auto;
-        background-position: center center, 0 0;
-        background-attachment: scroll; /* 固定だとモバイルで不自然な場合がある */
-    }
-}
-
-/* タッチデバイスでのパフォーマンス向上: 大画面でもスクロール中にちらつく場合は fixed を解除 */
-@media (hover: none) and (pointer: coarse) {
-    body { background-attachment: scroll; }
 }

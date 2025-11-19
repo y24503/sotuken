@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- ファビコンエラー解決 -->
+    <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64,AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAA">
+    <!-- ★★★ 新しいタイトルとフォント ★★★ -->
+    <title>スカウター</title>
+    <!-- Tailwind CSS CDN (開発用) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // 開発環境用の設定
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'tech-mono': ['Share Tech Mono', 'monospace'],
+                        'orbitron': ['Orbitron', 'monospace'],
+                        'fzgonta': ['FZGontaKana', 'sans-serif']
+                    }
+                }
+            },
+            // v3.3以降でline-clampは標準搭載のため除外
+            plugins: [],
+            corePlugins: {
+                preflight: true
+            }
+        }
+        
+        // 本番環境警告を抑制（開発用）
+        if (typeof window !== 'undefined') {
+            const originalWarn = console.warn;
+            console.warn = function(...args) {
+                const message = args.join(' ');
+                if (message.includes('cdn.tailwindcss.com should not be used in production')) {
+                    return; // この警告を抑制
+                }
+                if (message.includes('@tailwindcss/line-clamp')) {
+                    return; // line-clamp警告を抑制
+                }
+                originalWarn.apply(console, args);
+            };
+        }
+    </script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- SCAUTER風フォントを読み込み -->
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@900&display=swap" rel="stylesheet">
+    <!-- custom fonts -->
+    <!-- MediaPipe Pose CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469242/pose.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.5.1675469242/drawing_utils.js"></script>
+    <!-- MediaPipe Camera Utils -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+</head>
+<body class="bg-gray-900 text-white font-tech-mono antialiased flex items-center justify-center min-h-screen">
+    <!-- 効果音 -->
+    <audio id="se-button" preload="none">
+        <source src="button.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="se-roulette" preload="none">
+        <source src="roulette.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="se-roulette2" preload="none">
+        <source src="roulette2.mp3" type="audio/mpeg">
+    </audio>
+    
+    <div class="container mx-auto p-4 max-w-5xl w-full">
+        <!-- ===== 三種バトル画面 ===== -->
+        <div id="screen-three-events-battle" class="screen hidden card space-y-6">
+            <h2 class="text-3xl font-bold text-center font-orbitron">三種バトル</h2>
+            <div id="three-events-status" class="text-center text-lg text-cyan-300">第1種目：P1から測定スタート</div>
+            <div class="flex flex-col md:flex-row gap-6 justify-center items-center">
+                <div class="w-full md:w-1/2">
+                    <div class="font-bold">プレイヤー1</div>
+                    <div id="three-p1-power" class="text-2xl text-green-400">戦闘力: 0</div>
+                </div>
+                <div class="w-full md:w-1/2">
+                    <div class="font-bold">プレイヤー2</div>
+                    <div id="three-p2-power" class="text-2xl text-yellow-300">戦闘力: 0</div>
+                </div>
+            </div>
+            <div class="flex gap-4 justify-center pt-4">
+                <button id="btn-three-start" class="btn">第1種目開始</button>
+            </div>
+            <div id="three-events-result" class="text-center text-xl font-bold mt-4"></div>
+        </div>
+        <!-- ===== バトル説明画面 ===== -->
+        <div id="screen-battle-info" class="screen hidden card space-y-6">
+            <h2 class="text-3xl font-bold text-center font-orbitron">バトルモード説明</h2>
+            <div class="text-left space-y-4 text-gray-300 font-sans">
+                <p>2人で交互に測定し、三種バトルで戦闘力を競います。</p>
+                <ul class="list-disc list-inside space-y-2 pl-4">
+                    <li>1. プレイヤー1の性別選択→測定→名前入力</li>
+                    <li>2. プレイヤー2の性別選択→測定→名前入力</li>
+                    <li>3. 三種バトル（3回勝負、毎回負けた方の戦闘力が減少）</li>
+                    <li>4. 最終戦闘力で勝敗決定！</li>
+                </ul>
+                <p>カメラの前で大きくポーズを決めて、最高の戦闘力を目指そう！</p>
+            </div>
+            <div class="flex gap-4 justify-center pt-4">
+                <button id="btn-battle-info-next" class="btn">バトル開始</button>
+                <button id="btn-battle-info-cancel" class="btn btn-secondary">やめる</button>
+            </div>
+        </div>
+        <!-- ... スタート画面、説明画面、性別選択画面は変更なし ... -->
+        <div id="screen-title" class="screen text-center space-y-12">
+            <h1 id="main-title" class="text-5xl md:text-7xl font-black tracking-tighter">BATTLE INDEX</h1>
+            <div class="flex flex-col md:flex-row gap-6 justify-center">
+                <button id="btn-goto-instructions" class="btn">スキャン</button>
+                <button id="btn-goto-ranking" class="btn btn-secondary">ランキング</button>
+                <button id="btn-goto-2pmeasure" class="btn btn-accent">バトル</button>
+                <button id="btn-goto-battle-info" class="btn btn-warning">バトルモード</button>
+            </div>
+        </div>
+
+
+        <!-- ===== 2人測定バトル画面 ===== -->
+        <div id="screen-2pmeasure" class="screen hidden card space-y-6">
+            <h2 class="text-3xl font-bold text-center font-orbitron">2人測定バトル</h2>
+            <div id="2pmeasure-stage" class="text-center text-xl text-cyan-300">1人目の測定を開始してください</div>
+            <div class="flex gap-4 justify-center pt-4">
+                <button id="btn-2pmeasure-start" class="btn">測定スタート</button>
+                <button id="btn-2pmeasure-next" class="btn btn-accent hidden">2人目へ</button>
+                <button id="btn-2pmeasure-battle" class="btn btn-accent hidden">対戦！</button>
+                <button id="btn-2pmeasure-exit" class="btn btn-secondary">やめる</button>
+            </div>
+        </div>
+        <!-- 3種バトル画面は削除 -->
+        <div id="screen-instructions" class="screen hidden card space-y-6"><h2 class="text-3xl font-bold text-center font-orbitron">experience</h2><div class="text-left space-y-4 text-gray-300 font-sans"><p>このシステムは、Webカメラに映ったあなたの姿から、秘められた戦闘能力指数「BATTLE INDEX」をリアルタイムに算出します。</p><ul class="list-disc list-inside space-y-2 pl-4"><li><strong>ポーズ:</strong> 体を大きく見せたり、構えを低くするとスコアが上がります。</li><li><strong>アクション:</strong> 素早い動きを繰り出すと、<strong class="text-white">アクションボーナス</strong>が加算されます！</li></ul><p>最高のポーズとアクションで、ハイスコアを目指してください！</p></div><div class="flex gap-4 justify-center pt-4"><button id="btn-back-to-title-1" class="btn btn-secondary">もどる</button><button id="btn-goto-gender" class="btn">つぎへ</button></div></div>
+        <div id="screen-gender" class="screen hidden card space-y-6"><h2 class="text-3xl font-bold text-center font-orbitron">あなたのタイプを選択</h2><div class="grid grid-cols-1 md:grid-cols-2 gap-6"><button class="gender-btn card text-center p-8 hover:bg-indigo-800 transition-colors duration-200" data-gender="male"><span class="text-6xl">🚹</span><p class="text-2xl font-bold mt-4 font-sans">男性</p></button><button class="gender-btn card text-center p-8 hover:bg-pink-800 transition-colors duration-200" data-gender="female"><span class="text-6xl">🚺</span><p class="text-2xl font-bold mt-4 font-sans">女性</p></button></div><div class="flex gap-4 justify-center pt-4"><button id="btn-back-to-instructions" class="btn btn-secondary">戻る</button></div></div>
+
+        <!-- ===== タイピングバトル画面 ===== -->
+        <div id="screen-typing-battle" class="screen hidden card space-y-6">
+            <h2 class="text-3xl font-bold text-center font-orbitron">TYPING BATTLE</h2>
+            <div id="typing-stage" class="text-center text-xl text-cyan-300">PLAYER1のターン - ラウンド1</div>
+            <div class="bg-gray-800 p-6 rounded-lg">
+                <div class="text-center mb-4">
+                    <p class="text-gray-400 mb-2">タイピングしてください:</p>
+                    <p id="typing-prompt" class="text-3xl font-mono text-yellow-300 mb-4">戦闘力測定中</p>
+                    <input id="typing-input" type="text" class="w-full p-3 rounded bg-gray-900 text-green-400 border-2 border-green-400 text-xl font-mono focus:outline-none focus:ring-2 focus:ring-cyan-400" placeholder="ここに入力..." autocomplete="off">
+                </div>
+                <div class="text-center text-gray-400 text-sm">
+                    <p>正確にタイピングしてEnterを押してください</p>
+                </div>
+            </div>
+            <div class="flex gap-4 justify-center pt-4">
+                <button id="btn-next-round" class="btn hidden">次のラウンド</button>
+                <button id="btn-exit-battle" class="btn btn-secondary">バトルを終了</button>
+            </div>
+        </div>
+
+        <!-- ===== クリックバトル画面 ===== -->
+        <div id="screen-click-battle" class="screen hidden card space-y-6">
+            <h2 class="text-3xl font-bold text-center font-orbitron">CLICK BATTLE</h2>
+            <div id="click-battle-info" class="text-center text-xl text-cyan-300">クリックバトル開始前</div>
+            
+            <!-- プレイヤー情報表示 -->
+            <div class="grid grid-cols-2 gap-6">
+                <div class="bg-gray-800 p-4 rounded-lg text-center">
+                    <h3 class="text-xl font-bold text-blue-400">PLAYER 1</h3>
+                    <div id="p1-name" class="text-lg text-white">PLAYER1</div>
+                    <div class="text-sm text-gray-400">測定戦闘力</div>
+                    <div id="p1-base-power" class="text-2xl font-bold text-green-400">0</div>
+                    <div class="text-sm text-gray-400 mt-2">現在の戦闘力</div>
+                    <div id="p1-current-power" class="text-3xl font-bold text-yellow-300">0</div>
+                    <div id="p1-clicks" class="text-sm text-cyan-300 mt-1">0 clicks</div>
+                </div>
+                
+                <div class="bg-gray-800 p-4 rounded-lg text-center">
+                    <h3 class="text-xl font-bold text-red-400">PLAYER 2</h3>
+                    <div id="p2-name" class="text-lg text-white">PLAYER2</div>
+                    <div class="text-sm text-gray-400">測定戦闘力</div>
+                    <div id="p2-base-power" class="text-2xl font-bold text-green-400">0</div>
+                    <div class="text-sm text-gray-400 mt-2">現在の戦闘力</div>
+                    <div id="p2-current-power" class="text-3xl font-bold text-yellow-300">0</div>
+                    <div id="p2-clicks" class="text-sm text-cyan-300 mt-1">0 clicks</div>
+                </div>
+            </div>
+            
+            <!-- クリックエリア -->
+            <div id="click-area" class="hidden bg-gradient-to-br from-red-600 to-orange-600 p-8 rounded-lg text-center cursor-pointer hover:from-red-500 hover:to-orange-500 transform hover:scale-105 transition-all duration-200 select-none" style="min-height: 200px; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">
+                🔥 クリックして攻撃！ 🔥
+            </div>
+            
+            <!-- タイマー表示 -->
+            <div id="click-timer" class="hidden text-center">
+                <div class="text-4xl font-bold text-red-400" id="timer-display">10</div>
+                <div class="text-gray-400">秒</div>
+            </div>
+            
+            <!-- コントロールボタン -->
+            <div class="flex gap-4 justify-center pt-4">
+                <button id="btn-start-click-battle" class="btn">クリックバトル開始</button>
+                <button id="btn-next-click-turn" class="btn hidden">次のターン</button>
+                <button id="btn-show-battle-result" class="btn btn-accent hidden">結果発表</button>
+                <button id="btn-exit-click-battle" class="btn btn-secondary">バトル終了</button>
+            </div>
+        </div>
+        
+        <!-- ===== 測定画面 (SCAUTERデザインに刷新) ===== -->
+        <div id="screen-measurement" class="screen hidden">
+            <div class="scouter-container">
+                <!-- 映像とランドマーク描画用のCanvas -->
+                <div class="video-wrapper">
+                    <video id="input-video" autoplay playsinline></video>
+                    <canvas id="output-canvas"></canvas>
+                </div>
+
+                <!-- HUDオーバーレイ -->
+                <div class="hud-overlay">
+                    <div class="hud-top-bar">
+                        <div class="status-box">
+                            <p>SYSTEM STATUS: <span id="socket-status" class="text-yellow-400">CONNECTING...</span></p>
+                            <p>TARGET: <span class="text-white">LIVE ANALYSIS</span></p>
+                        </div>
+                    </div>
+
+                    <div id="result-display" class="hud-main-readout">
+                        <h2 class="readout-label">BATTLE INDEX</h2>
+                        <p id="total-power" class="readout-value">0</p>
+                    </div>
+
+                    <div class="hud-sub-readouts">
+                        <p>身長: <span id="stat-height">0</span></p>
+                        <p>リーチ: <span id="stat-reach">0</span></p>
+                        <p>肩幅: <span id="stat-shoulder">0</span></p>
+                        <p>表情: <span id="stat-expression">0</span></p>
+                        <p>姿勢: <span id="stat-pose">0</span></p>
+                        <hr class="my-2 border-green-500 opacity-30">
+                        <p>BASE: <span id="base-power">0</span></p>
+                        <p>POSE: <span id="pose-bonus">0</span></p>
+                        <p>EXPR: <span id="expression-bonus">0</span></p>
+                        <p>ACTION: <span id="speed-bonus">0</span></p>
+                    </div>
+                    
+                    <div class="hud-bottom-bar">
+                        <div class="hud-grid-lines"></div>
+                        <button id="btn-start-measure" class="hud-button">START</button>
+                        <button id="btn-back-to-title-2" class="hud-button" style="left:140px;">EXIT</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ... ランキング画面は変更なし ... -->
+
+        <!-- ===== 名前入力モーダル ===== -->
+        <div id="name-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-70 z-50 hidden">
+            <div class="card max-w-xs w-full text-center p-8 relative">
+                <h2 class="text-2xl font-orbitron mb-4">NAME ENTRY</h2>
+                <input id="input-player-name" type="text" maxlength="12" class="w-full p-2 rounded bg-gray-900 text-green-400 border-2 border-green-400 text-xl font-mono mb-4 focus:outline-none focus:ring-2 focus:ring-cyan-400" placeholder="YOUR NAME" autocomplete="off">
+                <img id="save-preview" src="" alt="preview" style="display:none;margin:10px auto 0 auto;width:160px;height:120px;object-fit:cover;border-radius:8px;border:2px solid #00ff41;" />
+                <div class="flex gap-4 justify-center">
+                    <button id="btn-name-ok" class="btn">OK</button>
+                    <button id="btn-name-cancel" class="btn btn-secondary">CANCEL</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== バトル結果モーダル ===== -->
+        <div id="battle-result-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-80 z-50 hidden">
+            <div class="card max-w-2xl w-full text-center p-8">
+                <div id="victory-icon" class="text-8xl mb-4">🏆</div>
+                <h2 id="battle-winner-title" class="text-4xl font-orbitron font-bold mb-2">VICTORY!</h2>
+                <div id="battle-winner-name" class="text-3xl text-yellow-300 mb-6">PLAYER 1</div>
+                
+                <div class="grid grid-cols-2 gap-6 mb-6">
+                    <!-- Player 1 結果 -->
+                    <div class="bg-gray-800 p-4 rounded-lg">
+                        <h3 id="p1-result-name" class="text-xl font-bold text-blue-400 mb-2">PLAYER 1</h3>
+                        <div class="text-sm text-gray-400">戦闘力変化</div>
+                        <div id="p1-result-score" class="text-lg text-white mb-2">5000 → 5200</div>
+                        <div id="p1-result-clicks" class="text-sm text-cyan-300">15 クリック</div>
+                    </div>
+                    
+                    <!-- Player 2 結果 -->
+                    <div class="bg-gray-800 p-4 rounded-lg">
+                        <h3 id="p2-result-name" class="text-xl font-bold text-red-400 mb-2">PLAYER 2</h3>
+                        <div class="text-sm text-gray-400">戦闘力変化</div>
+                        <div id="p2-result-score" class="text-lg text-white mb-2">4800 → 4600</div>
+                        <div id="p2-result-clicks" class="text-sm text-cyan-300">13 クリック</div>
+                    </div>
+                </div>
+                
+                <div id="battle-penalty-info" class="text-sm text-yellow-300 mb-6">⚠️ PLAYER 2にペナルティ適用 (-200点)</div>
+                
+                <button id="btn-close-battle-result" class="btn btn-accent">結果を確認</button>
+            </div>
+        </div>
+        <div id="screen-ranking" class="screen hidden card space-y-6">
+            <h2 class="text-3xl font-bold text-center font-orbitron">BATTLE INDEX ランキング</h2>
+            <div id="ranking-list" class="space-y-3"></div>
+            <div class="flex gap-4 justify-center pt-4">
+                <button id="btn-back-to-title-3" class="btn btn-secondary">戻る</button>
+                <button id="btn-delete-selected" class="btn" style="background: linear-gradient(90deg, #dc2626 0%, #b91c1c 100%);">選択したデータを削除</button>
+                <button id="btn-clear-all-data" class="btn" style="background: linear-gradient(90deg, #7f1d1d 0%, #991b1b 100%);">全データ削除</button>
+            </div>
+        </div>
+
+    </div>
+    
+    <script src="script.js" type="module" defer></script>
+</body>
+</html>

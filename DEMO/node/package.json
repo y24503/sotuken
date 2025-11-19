@@ -1,0 +1,20 @@
+{
+  "name": "power-scan-node",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Node WebSocket server for POWER SCAN with Express API",
+  "main": "server.js",
+  "license": "MIT",
+  "scripts": {
+    "start": "node server.js",
+    "start:watch": "nodemon server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "express": "^4.19.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "battle-index-frontend",
+  "version": "1.0.0",
+  "description": "Battle Index Frontend with optimized Tailwind CSS",
+  "scripts": {
+    "dev": "python -m http.server 8080",
+    "build": "npx tailwindcss -i ./src/input.css -o ./dist/output.css --watch",
+    "build-prod": "npx tailwindcss -i ./src/input.css -o ./dist/output.css --minify",
+    "start": "npm run dev"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32"
+  }
+}

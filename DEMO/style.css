@@ -236,3 +236,47 @@ body::before {
   .hud-button { padding: 6px 18px; font-size: 0.95rem; }
     .hud-sub-readouts { bottom: 110px; right: 100px; font-size: 0.95rem; }
 }
+
+/* 連打エリアの波紋エフェクト */
+.ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,255,255,0.6) 0%, rgba(0,255,255,0.3) 30%, rgba(0,255,255,0) 70%);
+    transform: scale(0);
+    animation: ripple-effect 0.6s ease-out;
+    pointer-events: none;
+    z-index: 10;
+}
+
+@keyframes ripple-effect {
+    0% {
+        transform: scale(0);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(4);
+        opacity: 0;
+    }
+}
+
+/* 連打エリアのホバー効果 */
+#battle-mouse:hover {
+    background: linear-gradient(45deg, #4a5568 0%, #2d3748 100%);
+    box-shadow: 0 0 20px rgba(0,255,255,0.3);
+    transition: all 0.3s ease;
+}
+
+/* クリックカウンターのスタイル */
+#click-counter {
+    text-shadow: 0 0 10px #00ffff;
+    animation: pulse-glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes pulse-glow {
+    0% {
+        text-shadow: 0 0 10px #00ffff;
+    }
+    100% {
+        text-shadow: 0 0 20px #00ffff, 0 0 30px #00ffff;
+    }
+}
