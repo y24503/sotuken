@@ -42,8 +42,8 @@ function drawLandmarks(ctx, lm) {
     const h = ctx.canvas.height;
     ctx.save();
     ctx.lineWidth = 4;
-    ctx.strokeStyle = '#00ff80';
-    ctx.shadowColor = '#00ff80';
+    ctx.strokeStyle = '#3b82f6'; // 青ライン (Tailwind blue-500 相当)
+    ctx.shadowColor = '#3b82f6'; // 青発光
     ctx.shadowBlur = 12;
     POSE_CONNECTIONS.forEach(([a,b]) => {
         const p = lm[a];
@@ -59,7 +59,7 @@ function drawLandmarks(ctx, lm) {
         ctx.stroke();
     });
     ctx.shadowBlur = 0;
-    ctx.fillStyle = '#ffd700';
+    ctx.fillStyle = '#ef4444'; // 赤点 (Tailwind red-500 相当)
     lm.forEach(p => {
         const px = (flipLandmarksHorizontally ? (1 - p.x) : p.x) * w;
         const py = p.y * h;

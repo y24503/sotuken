@@ -165,6 +165,19 @@ body {
  animation: neon-flicker 2.2s infinite alternate;
 }
 
+/* タイトル下サブタイトル（黒い輪郭＋黄色塗り） */
+#sub-title {
+    color: #ffd700; /* 内側の色（黄色） */
+    -webkit-text-stroke: 1px black; /* 黒い輪郭 */
+    /* 太めの黒縁を text-shadow で補強 */
+    text-shadow:
+        -2px -2px 0 #000,
+         2px -2px 0 #000,
+        -2px  2px 0 #000,
+         2px  2px 0 #000,
+         4px  4px 6px rgba(0,0,0,0.45);
+}
+
 /* --- スクロールバーの見た目調整 --- */
 /* カスタムスクロールバーでネオン感を維持 */
 ::-webkit-scrollbar {
