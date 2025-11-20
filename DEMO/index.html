@@ -13,7 +13,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.5.1675469242/drawing_utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 </head>
-
+    <!-- Battle BGM (loops only while on battle screen) -->
+    <audio id="bgm-battle" src="music/bgm2.mp3" preload="auto" loop></audio>
 <body class="bg-gray-900 text-white font-tech-mono antialiased flex items-center justify-center min-h-screen">
     
     <audio id="se-button" src="src/sfx/button.mp3" preload="auto"></audio>
@@ -24,7 +25,10 @@
     <div class="container mx-auto p-4 max-w-5xl w-full">
 
         <div id="screen-title" class="screen text-center space-y-12">
-            <h1 id="main-title" class="text-5xl md:text-7xl font-black tracking-tighter font-orbitron">POWER SCAN</h1>
+                <h1 id="main-title" class="text-8xl md:text-10xl font-black tracking-tighter font-orbitron">J S O K</h1>
+            <div class="text-center -mt-6">
+                <div id="sub-title" class="text-2xl md:text-4xl text-red-300 font-mono tracking-wider">〜 人類最強王決定戦 〜</div>
+            </div>
             <div class="flex flex-col md:flex-row gap-6 justify-center">
                 <button id="btn-goto-instructions" class="btn">スタート</button>
                 <a href="ranking.html" class="btn btn-secondary">ランキング</a>

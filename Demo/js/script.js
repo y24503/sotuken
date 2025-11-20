@@ -434,6 +434,8 @@ try { window.battleState = battleState; } catch(e){}
     //  showBattleScreen とは別の画面 #screen-battle-result を表示するためのものです)
     function showBattleResult({ p1, p2 }) {
         // 結果表示用のHTML要素を取得
+            // バトル画面を離れるのでBGM停止
+            try { stopBattleBGM(); } catch(e){}
         const p1NameEl = document.getElementById('battle-p1-name');
         const p2NameEl = document.getElementById('battle-p2-name');
         const p1ScoreEl = document.getElementById('battle-p1-score');
@@ -486,6 +488,9 @@ try { window.battleState = battleState; } catch(e){}
         let clickCount2 = 0; // P2のクリック回数
         let intervalId = null; // タイマー（setInterval）のID
         let isBattleActive = false; // 連打受付中フラグ
+
+            // バトル画面に入ったのでBGM開始（ユーザー操作後の呼び出し想定）
+            try { playBattleBGM(); } catch(e){}
     
         // --- UI初期化 ---
         // プレイヤーの測定結果を画面に反映
@@ -622,10 +627,11 @@ try { window.battleState = battleState; } catch(e){}
                 }
             }, 600);
         }        // --- バトル画面のEXIT（戻る）ボタン ---
-        document.getElementById('battle-exit').onclick = () => {
-            clearInterval(intervalId); // バトルタイマーを強制停止
-            showScreen('title'); // タイトル画面に戻る
-        };
+        document.getElementById('battle-exit').onclick = () => {
+            clearInterval(intervalId); // バトルタイマーを強制停止
+            stopBattleBGM(); // BGM停止
+            showScreen('title'); // タイトル画面に戻る
+        };
     }
     
     // ---- 効果音フォールバック: sfx/ が無い環境でも動くようにパスを補正 ----
@@ -717,6 +723,18 @@ try { window.battleState = battleState; } catch(e){}
             seButton.currentTime = 0; // 再生位置を最初に戻す（連打できるように）
             seButton.play(); // 再生
         }
+    }
+
+    // --- 戦闘用BGM再生制御 ---
+    function playBattleBGM(){
+        const el = document.getElementById('bgm-battle');
+        if (!el) return;
+        try { el.play(); } catch(e) {}
+    }
+    function stopBattleBGM(){
+        const el = document.getElementById('bgm-battle');
+        if (!el) return;
+        try { el.pause(); el.currentTime = 0; } catch(e) {}
     }
     
     // --- DOM取得 ---
