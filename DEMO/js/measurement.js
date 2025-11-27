@@ -108,6 +108,13 @@ const POWER_CONSTANTS = {
     genderMultiplier: { male: 1.00, female: 1.10 }
 };
 
+// 実身長の概算（任意）: 有効化するとカメラ距離と垂直FOVから概算m値を出します
+const CAMERA_APPROX = {
+    enable: true,    // 実身長[m]の概算を表示する
+    distanceM: 3.0,  // カメラから被写体までの距離[m]
+    vFovDeg: 40      // カメラの垂直画角[度]（必要に応じて校正）
+};
+
 // --- MediaPipe Pose 関連 ---
 let pose = null; // MediaPipe Pose のインスタンス
 let videoRenderRAF = null; // requestAnimationFrame ID (ビデオ描画用)
@@ -139,9 +146,9 @@ function computeCombatStatsFromLandmarks(lm) {
     const clip01 = (x) => Math.max(0, Math.min(1, x)); // 0.0〜1.0の範囲に値をクリップ
 
     // --- 必要なランドマークを取得 ---
-    const top = lm[0]; // 頭頂
-    const ankleL = lm[29]; // 左足首
-    const ankleR = lm[30]; // 右足首
+    const top = lm[0]; // 鼻（旧コメント: 頭頂）
+    const ankleL = lm[29]; // 左かかと（旧コメント: 左足首）
+    const ankleR = lm[30]; // 右かかと（旧コメント: 右足首）
     const wristL = lm[15]; // 左手首
     const wristR = lm[16]; // 右手首
     const shoulderL = lm[11]; // 左肩
@@ -151,7 +158,12 @@ function computeCombatStatsFromLandmarks(lm) {
 
     // --- 1. 体格 (Base) の計算 ---
     // (各値はランドマークの座標(0〜1)に基づいているため、ピクセル単位ではない)
-    const height = Math.abs(top.y - ((ankleL.y + ankleR.y) / 2)); // 身長 (頭頂〜足首のY差)
+    // 画面内の身長比（0〜1）: 頭部候補の最上点〜足部候補の最下点
+    const headCandidates = [lm[0], lm[2], lm[5], lm[7], lm[8]].filter(Boolean); // 鼻/両目/両耳
+    const footCandidates = [lm[27], lm[28], lm[29], lm[30], lm[31], lm[32]].filter(Boolean); // 足首/かかと/つま先
+    const headY = headCandidates.length ? Math.min(...headCandidates.map(p => p.y)) : top.y;
+    const footY = footCandidates.length ? Math.max(...footCandidates.map(p => p.y)) : ((ankleL?.y + ankleR?.y) / 2 || top.y);
+    const height = Math.max(0, Math.min(1, footY - headY));
     const reach = v2(wristL, wristR); // リーチ (両手首の距離)
     const shoulder = v2(shoulderL, shoulderR); // 肩幅 (両肩の距離)
     const leg = v2(hipL, ankleL) + v2(hipR, ankleR); // 両足の長さ (腰〜足首)
@@ -213,14 +225,26 @@ function computeCombatStatsFromLandmarks(lm) {
     // 基礎点 + 上乗せ分 = 最終戦闘力
     const total = Math.round(POWER_CONSTANTS.baseline + sumParts);
 
-    // 最終的なオブジェクトを返す
+    // 実身長の概算（任意）
+    let height_m = null;
+    if (CAMERA_APPROX.enable) {
+        try {
+            const vfov = (CAMERA_APPROX.vFovDeg || 40) * Math.PI / 180;
+            const sceneHeightM = 2 * (CAMERA_APPROX.distanceM || 3.0) * Math.tan(vfov / 2);
+            height_m = sceneHeightM * height;
+        } catch (e) {}
+    }
+
+    // 最終的なオブジェクトを返す
     return {
         base_power: Math.round(base_amount),
         pose_bonus: Math.round(pose_amount),
         expression_bonus: Math.round(expr_amount),
     // speed_bonus 削除
-        total_power: total,
-        height, reach, shoulder, expression: exprN, pose: poseN // 生データ（デバッグ表示用）
+        total_power: total,
+        height, // 画面内比率（0〜1）
+        height_m, // 実身長の概算[m]（CAMERA_APPROX.enable=true のとき）
+        reach, shoulder, expression: exprN, pose: poseN // 生データ（デバッグ表示用）
     };
 }
 
@@ -233,7 +257,18 @@ function updateStats(stats) {
     try { totalPowerEl.textContent = stats.total_power.toLocaleString(); } catch(e){}
     try { basePowerEl.textContent = stats.base_power.toLocaleString(); } catch(e){}
     // ボーナス詳細は非表示要求により更新処理を省略
-    try { statHeight.textContent = stats.height ? stats.height.toFixed(2) : '-'; } catch(e){}
+    try {
+        if (typeof stats.height_m === 'number' && !Number.isNaN(stats.height_m)) {
+            statHeight.textContent = `${stats.height_m.toFixed(2)} m`;
+        } else if (typeof stats.height === 'number') {
+            // 概算mが無効な場合のフォールバック（比率→cm相当っぽく見せるのは避け、%は出さない）
+            // m表示希望に合わせ、概算が出ない時のみ比率を簡易換算: 2.0m視野高を仮定
+            const approxM = 2.0 * (stats.height || 0);
+            statHeight.textContent = `${approxM.toFixed(2)} m`;
+        } else {
+            statHeight.textContent = '-';
+        }
+    } catch(e){}
     try { statReach.textContent = stats.reach ? stats.reach.toFixed(2) : '-'; } catch(e){}
     try { statShoulder.textContent = stats.shoulder ? stats.shoulder.toFixed(2) : '-'; } catch(e){}
     try { statExpression.textContent = stats.expression ? stats.expression.toFixed(2) : '-'; } catch(e){}
