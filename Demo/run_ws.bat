@@ -5,6 +5,22 @@ title Demo Node Server
 echo === Demo Node server start ===
 echo Script dir: %SCRIPT_DIR%
 
+REM Check Node.js and npm availability for any user account
+where node >nul 2>nul
+if errorlevel 1 (
+	echo [ERROR] Node.js が見つかりません。 https://nodejs.org/ からインストールし、PATHを設定してください。
+	endlocal
+	pause
+	exit /b 1
+)
+where npm >nul 2>nul
+if errorlevel 1 (
+	echo [ERROR] npm が見つかりません。Node.js のインストールと PATH 設定を確認してください。
+	endlocal
+	pause
+	exit /b 1
+)
+
 REM Go to node folder
 if not exist "%SCRIPT_DIR%node" goto NO_NODE_DIR
 cd /d "%SCRIPT_DIR%node"

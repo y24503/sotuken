@@ -178,8 +178,42 @@ function computeCombatStatsFromLandmarks(lm) {
 
     // --- 2. スタイル (Style) の計算 ---
     const spineMid = { x: (hipL.x + hipR.x) / 2, y: (hipL.y + hipR.y) / 2 }; // 背骨中央（腰）
-    const poseVal = v2(top, spineMid); // ポーズ値（頭頂から腰の距離 = 背筋の伸び）
-    const poseN = clip01(poseVal / 0.5); // 正規化ポーズ値
+    // 角度ベースの姿勢評価: 関節の曲がり具合と開き具合を0..1に集約
+    function angle(a,b,c){
+        const ab = {x:a.x-b.x, y:a.y-b.y};
+        const cb = {x:c.x-b.x, y:c.y-b.y};
+        const dot = ab.x*cb.x + ab.y*cb.y;
+        const nab = Math.hypot(ab.x,ab.y); const ncb = Math.hypot(cb.x,cb.y);
+        const cos = (nab>0 && ncb>0) ? (dot/(nab*ncb)) : 1;
+        const ang = Math.acos(Math.max(-1, Math.min(1, cos))); // 0..π
+        return ang;
+    }
+    // 肘・膝の曲げ: 伸びているほど高評価（角度がπに近い）
+    const leftElbowAng = angle(lm[11], lm[13], lm[15]);
+    const rightElbowAng = angle(lm[12], lm[14], lm[16]);
+    const leftKneeAng = angle(lm[23], lm[25], lm[27]);
+    const rightKneeAng = angle(lm[24], lm[26], lm[28]);
+    function bendScore(theta){
+        // 曲げ優遇: θ=0で1.0, θ=π/2で0.5, θ=πで0.0
+        return clip01(1 - (theta/Math.PI));
+    }
+    const elbowScore = (bendScore(leftElbowAng)+bendScore(rightElbowAng))/2;
+    const kneeScore = (bendScore(leftKneeAng)+bendScore(rightKneeAng))/2;
+    // 開き具合: 肩幅比の腕開き/脚開きを評価（左右手首間と足首間の距離）
+    const handSpread = dist2D(lm[15], lm[16]);
+    const footSpread = dist2D(lm[27], lm[28]);
+    const shoulderWidth = dist2D(lm[11], lm[12]);
+    const hipWidth = dist2D(lm[23], lm[24]);
+    const handOpenN = clip01( handSpread / Math.max(shoulderWidth, 1e-6) );
+    const footOpenN = clip01( footSpread / Math.max(hipWidth, 1e-6) );
+    // 体幹直立度: 肩中心→腰中心ベクトルの縦向き具合
+    const shoulderMid = { x:(lm[11].x+lm[12].x)/2, y:(lm[11].y+lm[12].y)/2 };
+    const t = { x: spineMid.x - shoulderMid.x, y: spineMid.y - shoulderMid.y };
+    const tlen = Math.hypot(t.x,t.y);
+    const vy = (tlen>0) ? (t.y/tlen) : 1; // 上向きベクトルとの余弦（縦成分）
+    const upright = clip01( (vy+1)/2 ); // -1..1 -> 0..1
+    // 総合姿勢スコア（係数は経験値で調整可能）
+    const poseN = clip01( 0.35*elbowScore + 0.25*kneeScore + 0.20*handOpenN + 0.10*footOpenN + 0.10*upright );
     const face = lm.slice(0, 5).map(p => [p.x, p.y]).flat(); // 顔の主要5点の座標
     const exprN = clip01(std(face) / 0.05); // 表情値（顔の標準偏差 = 顔の動き）
 
