@@ -1,0 +1,11 @@
+This folder should contain the following files for offline MediaPipe Pose:
+
+- pose.js
+- pose_solution_packed_assets_loader.js
+- pose_solution_packed_assets.data
+- pose_solution_simd_wasm_bin.wasm
+- pose_solution_wasm_bin.js
+- pose_solution_simd_wasm_bin.js
+
+If some files fail to download via get_pose.ps1 (network/cdn issue), open this URL in a browser and save the files manually:
+https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469242/

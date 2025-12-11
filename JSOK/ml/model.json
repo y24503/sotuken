@@ -1,0 +1,14 @@
+{
+  "model_type": "ridge",
+  "feature_names": [
+    "reach_norm","shoulder_norm","leg_norm","poseN","exprN",
+    "stance_w","elbowL_deg","elbowR_deg","kneeL_deg","kneeR_deg"
+  ],
+  "weights": [
+    0.20, 0.15, 0.10,
+    0.25, 0.20,
+    0.05, 0.03, 0.03, 0.02, 0.02
+  ],
+  "bias": 0.0,
+  "preprocess": { "type": "none" }
+}

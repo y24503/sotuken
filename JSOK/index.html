@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POWER SCAN</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469242/pose.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.5.1675469242/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+</head>
+    <!-- Battle BGM (loops only while on battle screen) -->
+    <audio id="bgm-battle" src="music/bgm2.mp3" preload="auto" loop></audio>
+<body class="bg-gray-900 text-white font-tech-mono antialiased flex items-center justify-center min-h-screen">
+    
+    <audio id="se-button" src="src/sfx/button.mp3" preload="auto"></audio>
+    <audio id="se-roulette" src="src/sfx/roulette.mp3" preload="auto"></audio>
+    <audio id="se-roulette2" src="src/sfx/roulette2.mp3" preload="auto"></audio>
+    
+    
+    <div class="container mx-auto p-4 max-w-5xl w-full">
+
+        <div id="screen-title" class="screen text-center space-y-12">
+                <h1 id="main-title" class="text-8xl md:text-10xl font-black tracking-tighter font-orbitron">J S O K</h1>
+            <div class="text-center -mt-6">
+                <div id="sub-title" class="text-2xl md:text-4xl text-yellow-300 font-mono tracking-wider">〜 人類最強王決定戦 〜</div>
+            </div>
+            <div class="flex flex-col md:flex-row gap-6 justify-center">
+                <button id="btn-goto-instructions" class="btn">スタート</button>
+                <a href="ranking.html" class="btn btn-secondary">ランキング</a>
+                <button id="btn-goto-2pmeasure" class="btn btn-accent">バトル</button>
+            </div>
+
+            
+        </div>
+
+        <div id="screen-2pmeasure" class="screen hidden card space-y-6">
+            <h2 class="text-3xl font-bold text-center font-orbitron">  </h2>
+            <div id="2pmeasure-stage" class="text-center text-xl text-cyan-300">１人目 START
+                <button id="btn-2pmeasure-start" class="btn">START</button>
+                <button id="btn-2pmeasure-next" class="btn btn-accent hidden">２人目へ</button>
+                <button id="btn-2pmeasure-battle" class="btn btn-accent hidden">バトル！</button>
+                <button id="btn-2pmeasure-exit" class="btn btn-secondary">やめる</button>
+            </div>
+        </div>
+
+        <div id="screen-battle" class="screen hidden card space-y-6">
+            <h2 class="text-3xl font-bold text-center font-orbitron">BATTLE</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                <div class="p-4 bg-gray-800 rounded text-center">
+                    <img id="battle-img1" src="img/player1.jpg" alt="p1" class="mx-auto w-40 h-40 object-cover rounded-full border-2 border-yellow-400">
+                    <div id="battle-name1" class="text-2xl font-orbitron mt-2">PLAYER1</div>
+                    <div class="mt-4">
+                        <div class="w-full bg-gray-700 h-4 rounded overflow-hidden">
+                            <div id="battle-gauge1" class="bg-yellow-400 h-4" style="width:100%"></div>
+                        </div>
+                        <div id="battle-score1" class="text-yellow-300 text-lg mt-2">0/0</div>
+                    </div>
+                </div>
+                <div class="p-4 bg-gray-800 rounded text-center">
+                    <img id="battle-img2" src="img/player2.jpg" alt="p2" class="mx-auto w-40 h-40 object-cover rounded-full border-2 border-cyan-400">
+                    <div id="battle-name2" class="text-2xl font-orbitron mt-2">PLAYER2</div>
+                    <div class="mt-4">
+                        <div class="w-full bg-gray-700 h-4 rounded overflow-hidden">
+                            <div id="battle-gauge2" class="bg-cyan-400 h-4" style="width:100%"></div>
+                        </div>
+                        <div id="battle-score2" class="text-cyan-300 text-lg mt-2">0/0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center mt-4">
+                <div id="battle-instruct" class="text-lg text-gray-200 mb-2">開始ボタンを押したらバトルスタートだ！</div>
+                <div id="battle-timer" class="text-4xl font-mono text-white mb-4">00:10</div>
+                <button id="battle-start-btn" class="btn">START</button>
+                <button id="battle-start-btn-2p" class="btn hidden">２P START</button>
+                <div id="battle-mouse" class="hidden mt-4 cursor-pointer select-none p-8 rounded bg-gradient-to-r from-gray-800 to-gray-700 relative overflow-hidden">
+                    <div class="text-center mb-2">連打エリア（ここを連打）</div>
+                    <div id="click-counter" class="text-2xl font-mono text-cyan-300">クリック数: 0</div>
+                </div>
+                <div class="mt-6">
+                    <button id="battle-exit" class="btn btn-secondary">戻る</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="screen-battle-result" class="screen hidden card space-y-6">
+            <h2 class="text-3xl font-bold text-center font-orbitron">バトル　リザルト</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-center">
+                <div class="p-4 bg-gray-800 rounded">
+                    <div class="text-gray-400 text-sm">PLAYER 1</div>
+                    <div id="battle-p1-name" class="text-2xl font-orbitron">PLAYER1</div>
+                    <div id="battle-p1-score" class="text-3xl text-yellow-300 font-mono">0</div>
+                </div>
+                <div class="p-4 bg-gray-800 rounded">
+                    <div class="text-gray-400 text-sm">PLAYER 2</div>
+                    <div id="battle-p2-name" class="text-2xl font-orbitron">PLAYER2</div>
+                    <div id="battle-p2-score" class="text-3xl text-yellow-300 font-mono">0</div>
+                </div>
+            </div>
+            <div id="battle-winner-text" class="text-center text-2xl text-cyan-300 font-orbitron">対戦結果</div>
+            <div class="flex gap-4 justify-center pt-2">
+                <button id="btn-battle-rematch" class="btn">再挑戦</button>
+                <button id="btn-battle-back" class="btn btn-secondary">タイトルへ</button>
+            </div>
+        </div>
+
+        <div id="screen-instructions" class="screen hidden card space-y-6">
+            <h2 class="text-3xl font-bold text-center font-orbitron">experience</h2>
+            <div class="text-center space-y-4 text-gray-300 font-sans">
+                <p> <strong class="text-white"> このカメラで撮影したキミの姿から秘められた戦闘力測ることができるぞ！</strong></p>
+                <ul class="list-disc list-inside space-y-2 pl-4">
+                    <p> <strong class="text-white"> カメラの前でポーズを決めると戦闘力が上がるかもしれない！</strong></p>
+                    <p><strong class="text-white">キミなりの最高の決めポーズをするんだ！</strong></p>
+                </ul>
+                <p>＊なお「戦闘力」は仮想の数値なので鵜呑みにはしないようお願いします。</p>
+            </div>
+            <div class="flex gap-4 justify-center pt-4">
+                <button id="btn-back-to-title-1" class="btn btn-secondary">もどる</button>
+                <button id="btn-goto-gender" class="btn">つぎへ</button>
+            </div>
+        </div>
+
+        <div id="screen-gender" class="screen hidden card space-y-6">
+            <h2 class="text-3xl font-bold text-center font-orbitron">あなたのタイプを選択</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <button class="gender-btn card text-center p-8 hover:bg-indigo-800 transition-colors duration-200" data-gender="male">
+                    <span class="text-6xl">🚹</span>
+                    <p class="text-2xl font-bold mt-4 font-sans">男性</p>
+                </button>
+                <button class="gender-btn card text-center p-8 hover:bg-pink-800 transition-colors duration-200" data-gender="female">
+                    <span class="text-6xl">🚺</span>
+                    <p class="text-2xl font-bold mt-4 font-sans">女性</p>
+                </button>
+            </div>
+            <div class="flex gap-4 justify-center pt-4">
+                <button id="btn-back-to-instructions" class="btn btn-secondary">戻る</button>
+            </div>
+        </div>
+
+        <!-- 2P対戦: 1人目性別選択 -->
+        <div id="screen-2p-gender-1" class="screen hidden card space-y-6">
+            <h2 class="text-3xl font-bold text-center font-orbitron">1人目のタイプを選択</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <button class="gender-btn card text-center p-8 hover:bg-indigo-800 transition-colors duration-200" data-gender="male" data-player="1">
+                    <span class="text-6xl">🚹</span>
+                    <p class="text-2xl font-bold mt-4 font-sans">男性</p>
+                </button>
+                <button class="gender-btn card text-center p-8 hover:bg-pink-800 transition-colors duration-200" data-gender="female" data-player="1">
+                    <span class="text-6xl">🚺</span>
+                    <p class="text-2xl font-bold mt-4 font-sans">女性</p>
+                </button>
+            </div>
+            <div class="flex gap-4 justify-center pt-4">
+                <button id="btn-2p-gender1-cancel" class="btn btn-secondary">やめる</button>
+            </div>
+        </div>
+
+        <!-- 2P対戦: 2人目性別選択 -->
+        <div id="screen-2p-gender-2" class="screen hidden card space-y-6">
+            <h2 class="text-3xl font-bold text-center font-orbitron">2人目のタイプを選択</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <button class="gender-btn card text-center p-8 hover:bg-indigo-800 transition-colors duration-200" data-gender="male" data-player="2">
+                    <span class="text-6xl">🚹</span>
+                    <p class="text-2xl font-bold mt-4 font-sans">男性</p>
+                </button>
+                <button class="gender-btn card text-center p-8 hover:bg-pink-800 transition-colors duration-200" data-gender="female" data-player="2">
+                    <span class="text-6xl">🚺</span>
+                    <p class="text-2xl font-bold mt-4 font-sans">女性</p>
+                </button>
+            </div>
+            <div class="flex gap-4 justify-center pt-4">
+                <button id="btn-2p-gender2-cancel" class="btn btn-secondary">やめる</button>
+            </div>
+        </div>
+		
+	<!-- measurement HTML は別ファイルへ分離しました -->
+	
+    </div> <script src="js/script.js" type="module" defer></script>
+</body>
+</html>

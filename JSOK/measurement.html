@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POWER SCAN - Measurement</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@900&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-900 text-white font-tech-mono antialiased flex items-center justify-center min-h-screen">
+    <audio id="se-button" src="src/sfx/button.mp3" preload="auto"></audio>
+    <audio id="se-roulette" src="src/sfx/roulette.mp3" preload="auto"></audio>
+    <audio id="se-roulette2" src="src/sfx/roulette2.mp3" preload="auto"></audio>
+
+    <div class="container mx-auto p-4 max-w-5xl w-full">
+        <div id="screen-measurement" class="screen">
+            <div class="scouter-container">
+                <div class="video-wrapper">
+                    <video id="input-video" autoplay playsinline></video>
+                    <canvas id="output-canvas"></canvas>
+                </div>
+
+                <div class="hud-overlay">
+                    <div class="hud-top-bar">
+                        <div class="status-box">
+                            <p>SYSTEM STATUS: <span id="socket-status" class="text-yellow-400">CONNECTING...</span></p>
+                            <p>TARGET: <span class="text-white">LIVE ANALYSIS</span></p>
+                            <p class="mt-1 text-sm">LM表示: <button id="toggle-landmarks" class="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs">OFF</button></p>
+                        </div>
+                    </div>
+
+                    <div id="result-display" class="hud-main-readout">
+                        <h2 class="readout-label">POWER SCAN</h2>
+                        <p id="total-power" class="readout-value">0</p>
+                    </div>
+
+                    <div class="hud-sub-readouts">
+                        <p>身長: <span id="stat-height">0</span></p>
+                        <p>リーチ: <span id="stat-reach">0</span></p>
+                        <p>肩幅: <span id="stat-shoulder">0</span></p>
+                        <p>表情: <span id="stat-expression">0</span></p>
+                        <p>姿勢: <span id="stat-pose">0</span></p>
+                        <hr class="my-2 border-green-500 opacity-30">
+                        <p>BASE: <span id="base-power">0</span></p>
+                        <p>POSE: <span id="pose-bonus">0</span></p>
+                        <p>EXPR: <span id="expression-bonus">0</span></p>
+                        <p>ACTION: <span id="speed-bonus">0</span></p>
+                    </div>
+                    
+                    <div class="hud-bottom-bar">
+                        <div class="hud-grid-lines"></div>
+                        <button id="btn-start-measure" class="hud-button">START</button>
+                        <button id="btn-back-to-title-2" class="hud-button hud-exit">EXIT</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="name-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-70 z-50 hidden">
+            <div class="card max-w-xs w-full text-center p-8 relative">
+                <h2 class="text-2xl font-fantasy mb-4">キミの名前を入力してくれ！</h2>
+                <input id="input-player-name" type="text" maxlength="12" class="w-full p-2 rounded bg-gray-900 text-green-400 border-2 border-green-400 text-xl font-mono mb-4 focus:outline-none focus:ring-2 focus:ring-cyan-400" placeholder="YOUR NAME" autocomplete="off">
+                <img id="save-preview" src="" alt="preview" style="display:block;margin:10px auto 0 auto;width:160px;height:120px;object-fit:cover;border-radius:8px;" />
+                <div class="flex gap-4 justify-center">
+                    <button id="btn-name-ok" class="btn">OK</button>
+                    <button id="btn-name-cancel" class="btn btn-secondary">CANCEL</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/measurement.js" type="module" defer></script>
+</body>
+</html>
