@@ -39,7 +39,7 @@ REM HTTPS 生成を行わず、HTTP のみで起動します。
 
 REM Allow overriding port via first argument (e.g. run_ws.bat 8080) else default 8080
 set "APP_PORT=%~1"
-if "%APP_PORT%"=="" set "APP_PORT=8080"
+if "%APP_PORT%"=="" set "APP_PORT=8888"
 echo Using port %APP_PORT%
 
 REM Free target port if already in use (silent)

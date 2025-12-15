@@ -168,13 +168,14 @@ function computeCombatStatsFromLandmarks(lm) {
     const shoulder = v2(shoulderL, shoulderR); // 肩幅 (両肩の距離)
     const leg = v2(hipL, ankleL) + v2(hipR, ankleR); // 両足の長さ (腰〜足首)
 
-    // 身長比に正規化 (0〜1の範囲)
-    const eps = 1e-6; // ゼロ除算防止
-    const h = Math.max(height, eps);
-    const maxF = POWER_CONSTANTS.clipFeature; // 補正上限
-    const rN = clip01((reach / h) / maxF); // 正規化リーチ
-    const sN = clip01((shoulder / h) / maxF); // 正規化肩幅
-    const lN = clip01(((leg / h) / 2) / maxF); // 正規化脚長
+    // 身長で割る正規化はやめて、画面上の大きさそのものと身長の大きさで体格差を強調する
+    // height は 0〜1 の範囲（画面内での見かけの身長比）
+    const sizeN = clip01(height); // そのまま「大きさ係数」として利用
+    const maxF = POWER_CONSTANTS.clipFeature; // 補正上限（スケール用）
+    // リーチ・肩幅・脚の長さに sizeN を掛けることで、大柄な人ほど有利になるようにする
+    const rN = clip01((reach * sizeN) / maxF);      // 体格込みリーチ
+    const sN = clip01((shoulder * sizeN) / maxF);   // 体格込み肩幅
+    const lN = clip01(((leg * sizeN) / 2) / maxF);  // 体格込み脚長（左右平均）
 
     // --- 2. スタイル (Style) の計算 ---
     const spineMid = { x: (hipL.x + hipR.x) / 2, y: (hipL.y + hipR.y) / 2 }; // 背骨中央（腰）
@@ -200,10 +201,11 @@ function computeCombatStatsFromLandmarks(lm) {
     const elbowScore = (bendScore(leftElbowAng)+bendScore(rightElbowAng))/2;
     const kneeScore = (bendScore(leftKneeAng)+bendScore(rightKneeAng))/2;
     // 開き具合: 肩幅比の腕開き/脚開きを評価（左右手首間と足首間の距離）
-    const handSpread = dist2D(lm[15], lm[16]);
-    const footSpread = dist2D(lm[27], lm[28]);
-    const shoulderWidth = dist2D(lm[11], lm[12]);
-    const hipWidth = dist2D(lm[23], lm[24]);
+    // v2 は上で定義した2点間距離関数。dist2D の代わりに使用する。
+    const handSpread = v2(lm[15], lm[16]);
+    const footSpread = v2(lm[27], lm[28]);
+    const shoulderWidth = v2(lm[11], lm[12]);
+    const hipWidth = v2(lm[23], lm[24]);
     const handOpenN = clip01( handSpread / Math.max(shoulderWidth, 1e-6) );
     const footOpenN = clip01( footSpread / Math.max(hipWidth, 1e-6) );
     // 体幹直立度: 肩中心→腰中心ベクトルの縦向き具合
