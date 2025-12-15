@@ -17,33 +17,19 @@ function withTimeout(promise, ms) {
 
 export async function ensurePoseLoaded(statusEl) {
     if (window.Pose || (window.pose && window.pose.Pose)) return true;
-    // NOTE: Installed local version differs slightly (0.5.1675469404). Try local first.
-    const urls = [
-        // Local vendored assets (preferred if available)
-        '/mediapipe/pose/pose.js',
-        'mediapipe/pose/pose.js',
-        // From installed npm package served statically by our dev server
-        '/node/node_modules/@mediapipe/pose/pose.js',
-        'node/node_modules/@mediapipe/pose/pose.js',
-        // Fallbacks
-        'pose.js',
-        'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js',
-        'https://unpkg.com/@mediapipe/pose@0.5.1675469404/pose.js'
-    ];
-    for (const u of urls) {
-        try {
-            if (statusEl) statusEl.textContent = 'LOADING POSE...';
-            await withTimeout(loadScript(u), 8000);
-        } catch (_) { continue; }
-        if (window.Pose || (window.pose && window.pose.Pose)) {
-            // Derive base path for assets from loaded script URL
-            try {
-                const url = new URL(u, window.location.href);
-                const base = url.href.slice(0, url.href.lastIndexOf('/') + 1);
-                window._mpPoseBase = base; // used by createPose() caller
-            } catch {}
-            return true;
-        }
+    const cdn = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js';
+    try {
+        if (statusEl) statusEl.textContent = 'LOADING POSE...';
+        await withTimeout(loadScript(cdn), 8000);
+    } catch (_) {
+        if (statusEl) statusEl.textContent = 'POSE NOT FOUND';
+        return false;
+    }
+    if (window.Pose || (window.pose && window.pose.Pose)) {
+        // 固定で CDN ベースを使う
+        window._mpPoseBase = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/';
+        if (statusEl) statusEl.textContent = 'CAMERA READY';
+        return true;
     }
     if (statusEl) statusEl.textContent = 'POSE NOT FOUND';
     return false;

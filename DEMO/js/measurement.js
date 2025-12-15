@@ -384,20 +384,11 @@ async function startPoseLoop() {
     }
     // 既に動いているビデオ描画ループ(videoRenderRAF)は停止せず、
     // 下のrun内で毎フレーム描画するため改めてキャンバス更新を統合
-    if (videoRenderRAF) { cancelAnimationFrame(videoRenderRAF); videoRenderRAF = null; }
+    if (videoRenderRAF) cancelAnimationFrame(videoRenderRAF); 
 
     // 毎フレーム、ビデオ映像を MediaPipe Pose に送信するループ
     const run = async () => {
         try {
-            // 毎フレーム、ビデオフレームをキャンバスに描画（ポーズ結果がなくても更新）
-            if (videoEl && videoEl.readyState >= 2) {
-                const w = videoEl.videoWidth || canvasEl.width || 640;
-                const h = videoEl.videoHeight || canvasEl.height || 360;
-                if (canvasEl.width !== w) canvasEl.width = w;
-                if (canvasEl.height !== h) canvasEl.height = h;
-                const ctx = canvasEl.getContext('2d');
-                ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
-            }
             // poseインスタンスがあり、ビデオが再生準備完了(readyState >= 2)なら
             if (pose && videoEl && videoEl.readyState >= 2) {
                 await pose.send({ image: videoEl }); // ビデオフレームを送信
