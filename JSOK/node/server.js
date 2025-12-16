@@ -1,4 +1,4 @@
-// Demo POWER SCAN Node server
+// Demo JSOK Node server
 // - WebSocket: landmarks -> compute stats & append to CSV (power_scan_log.csv)
 // - REST API: ranking CSV (save/get/delete) + music list, and image save/delete
 
@@ -15,6 +15,7 @@ const RANKING_CSV = path.join(__dirname, 'ranking.csv');
 const DEMO_ROOT = path.resolve(__dirname, '..');
 const SRC_DIR = path.join(DEMO_ROOT, 'src');
 const MUSIC_DIR = path.join(DEMO_ROOT, 'music');
+const FEATURES_CSV = path.join(DEMO_ROOT, 'ml', 'data', 'features.csv');
 
 // --- helpers: ensure files/dirs
 function ensureFile(filePath, headerLine) {
@@ -28,6 +29,7 @@ function ensureDir(dir) {
 
 ensureFile(POWER_LOG_CSV, 'timestamp,base_power,pose_bonus,expression_bonus,speed_bonus,total_power,landmark_count\n');
 ensureFile(RANKING_CSV, 'id,name,score,image,created_at\n');
+ensureFile(FEATURES_CSV, 'reach_norm,shoulder_norm,leg_norm,poseN,exprN,stance_w,elbowL_deg,elbowR_deg,kneeL_deg,kneeR_deg,label\n');
 ensureDir(SRC_DIR);
 
 // --- CSV utils (very small, RFC4180-ish for our fields)
@@ -134,7 +136,7 @@ function deleteImageIfExists(fileName) {
   try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch {}
 }
 
-// --- WS: power scan logging
+// --- WS: JSOK logging
 function dist2D(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 function calcStats(landmarks) {
   if (!Array.isArray(landmarks) || landmarks.length < 29) {
@@ -221,6 +223,25 @@ app.get('/api/music-list', (_req, res) => {
   } catch (e) {
     res.json({ files: [] });
   }
+});
+
+// POST log_features { reach_norm,...,kneeR_deg,label }
+app.post('/api/log_features', (req, res) => {
+  const f = req.body || {};
+  const cols = [
+    f.reach_norm, f.shoulder_norm, f.leg_norm,
+    f.poseN, f.exprN,
+    f.stance_w, f.elbowL_deg, f.elbowR_deg, f.kneeL_deg, f.kneeR_deg,
+    f.label
+  ].map(v => csvEscape(v));
+  const line = cols.join(',') + '\n';
+  fs.appendFile(FEATURES_CSV, line, (err) => {
+    if (err) {
+      console.error('features.csv append error:', err.message);
+      return res.status(500).json({ success: false });
+    }
+    res.json({ success: true });
+  });
 });
 
 // --- PHP compatibility endpoints ---

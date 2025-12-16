@@ -2,7 +2,7 @@
   "name": "demo-power-scan-node",
   "private": true,
   "version": "0.1.0",
-  "description": "Demo folder Node WebSocket server for POWER SCAN (landmarks + CSV logging)",
+  "description": "Demo folder Node WebSocket server for JSOK (landmarks + CSV logging)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

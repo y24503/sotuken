@@ -261,7 +261,7 @@ async def main_ws():
     # websockets ライブラリが使える場合の通常モード
     async with websockets.serve(image_processing_handler, "localhost", 8765, max_size=1024*1024*2):  # type: ignore
         mode = "フェアモード" if FAIR_MODE else "通常モード"
-        print(f"POWER SCAN サーバー ({mode}) [websockets] が起動しました。")
+		print(f"JSOK サーバー ({mode}) [websockets] が起動しました。")
         await asyncio.Future()
 
 # ----------------------
@@ -317,7 +317,7 @@ def run_minimal_ws_server(host: str = "localhost", port: int = 8765) -> None:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind((host, port))
         s.listen(1)
-        print("POWER SCAN サーバー [fallback] が起動しました。依存なし簡易モードです。")
+        print("JSOK サーバー [fallback] が起動しました。依存なし簡易モードです。")
         while True:
             conn, _ = s.accept()
             with conn:

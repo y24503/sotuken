@@ -3,19 +3,19 @@ setlocal
 set "SCRIPTPATH=%~dp0"
 set "SERVER=%SCRIPTPATH%server.py"
 
-echo Starting POWER SCAN WS server (Python)...
+echo Starting JSOK WS server (Python)...
 
 :: Try with py launcher
 where py >nul 2>nul
 if %errorlevel%==0 (
-  start "POWER SCAN WS (py)" cmd /c py -3 "%SERVER%"
+  start "JSOK WS (py)" cmd /c py -3 "%SERVER%"
   goto :end
 )
 
 :: Fallback to python in PATH
 where python >nul 2>nul
 if %errorlevel%==0 (
-  start "POWER SCAN WS (python)" cmd /c python "%SERVER%"
+  start "JSOK WS (python)" cmd /c python "%SERVER%"
   goto :end
 )
 

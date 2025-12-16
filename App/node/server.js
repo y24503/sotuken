@@ -1,4 +1,4 @@
-// Minimal Node WebSocket server for POWER SCAN (no overlay drawing)
+// Minimal Node WebSocket server for JSOK (no overlay drawing)
 // Accepts DataURL (image) text frames from client and responds with
 // { image: <same data>, combat_stats: { ...zeros } }
 
@@ -26,7 +26,7 @@ function makeResponse(imageDataUrl) {
 
 function startServer() {
   const wss = new WebSocketServer({ port: PORT, host: 'localhost' });
-  console.log(`POWER SCAN Node WS server started on ws://localhost:${PORT}`);
+  console.log(`JSOK Node WS server started on ws://localhost:${PORT}`);
 
   wss.on('connection', (ws) => {
     ws.on('message', (data, isBinary) => {

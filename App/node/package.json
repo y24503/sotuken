@@ -2,7 +2,7 @@
   "name": "power-scan-node",
   "private": true,
   "version": "0.1.0",
-  "description": "Node WebSocket server for POWER SCAN",
+  "description": "Node WebSocket server for JSOK",
   "main": "server.js",
   "license": "MIT",
   "scripts": {

@@ -1,4 +1,4 @@
-# POWER SCAN (PHP + MediaPipe JS - サーバーレス)
+# JSOK (PHP + MediaPipe JS - サーバーレス)
 
 このデモは PHP でフロントとランキングAPIを配信し、映像解析はブラウザ内の MediaPipe Pose (JavaScript) で実行します。Python/Node の WebSocket サーバーは不要です。
 

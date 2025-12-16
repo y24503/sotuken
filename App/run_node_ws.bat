@@ -7,8 +7,8 @@ if not exist "%NODEDIR%\package.json" (
   goto :end
 )
 
-echo Starting POWER SCAN Node WS server...
-start "POWER SCAN Node WS" cmd /c "cd /d "%NODEDIR%" && npm start"
+echo Starting JSOK Node WS server...
+start "JSOK Node WS" cmd /c "cd /d "%NODEDIR%" && npm start"
 
 :end
 endlocal

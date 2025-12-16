@@ -484,8 +484,11 @@ try { window.battleState = battleState; } catch(e){}
         let timeLimit = 10; // 制限時間（秒）
         let timer = timeLimit; // 残り時間タイマー
         let phase = 1; // 1: 1P連打中, 2: 2P連打中, 3: 結果
-        let clickCount1 = 0; // P1のクリック回数
-        let clickCount2 = 0; // P2のクリック回数
+        let clickCount1 = 0; // P1のクリック回数
+        let clickCount2 = 0; // P2のクリック回数
+        // クリックごとのダメージ累積（P1に与えられた総ダメージ / P2に与えられた総ダメージ）
+        let damageToP1 = 0;
+        let damageToP2 = 0;
         let intervalId = null; // タイマー（setInterval）のID
         let isBattleActive = false; // 連打受付中フラグ
 
@@ -515,7 +518,8 @@ try { window.battleState = battleState; } catch(e){}
             isBattleActive = true; // 連打受付開始
             phase = 1; // 1Pのターン
             timer = timeLimit; // タイマーリセット
-            clickCount1 = 0; // 1Pクリック数リセット
+                clickCount1 = 0; // 1Pクリック数リセット
+                damageToP2 = 0;  // P2へのダメージもリセット
             document.getElementById('click-counter').textContent = 'クリック数: 0';
             document.getElementById('battle-timer').textContent = `00:${String(timer).padStart(2,'0')}`;
 
@@ -548,7 +552,8 @@ try { window.battleState = battleState; } catch(e){}
             document.getElementById('battle-mouse').classList.remove('hidden'); // 連打エリアを表示
             document.getElementById('battle-instruct').textContent = '2Pは連打！';
             isBattleActive = true; // 連打受付再開
-            clickCount2 = 0; // 2Pクリック数リセット
+                clickCount2 = 0; // 2Pクリック数リセット
+                damageToP1 = 0;  // P1へのダメージもリセット
             document.getElementById('click-counter').textContent = 'クリック数: 0';
 
             // 2Pのタイマー開始
@@ -557,16 +562,16 @@ try { window.battleState = battleState; } catch(e){}
                 document.getElementById('battle-timer').textContent = `00:${String(timer).padStart(2,'0')}`;
 
                 // --- 2Pのターン終了（バトル終了） ---
-                if (timer <= 0) {
+                    if (timer <= 0) {
                     clearInterval(intervalId); // 2Pタイマー停止
                     isBattleActive = false; // 連打受付終了
                     document.getElementById('battle-mouse').classList.add('hidden'); // 連打エリアを隠す
 
-                    // --- 勝敗判定 ---
-                    // P1へのダメージ = P2のクリック数 * 1000
-                    let damage1 = clickCount2 * 1000;
-                    // P2へのダメージ = P1のクリック数 * 1000
-                    let damage2 = clickCount1 * 1000;
+                        // --- 勝敗判定 ---
+                        // P1へのダメージ = P2連打中に累積したランダムダメージ
+                        let damage1 = damageToP1;
+                        // P2へのダメージ = 1P連打中に累積したランダムダメージ
+                        let damage2 = damageToP2;
                     // 最終スコア（HP）を計算（0未満にならないように Math.max を使用）
                     let final1 = Math.max(0, player1.score - damage1);
                     let final2 = Math.max(0, player2.score - damage2);
@@ -577,30 +582,52 @@ try { window.battleState = battleState; } catch(e){}
                     document.getElementById('battle-gauge1').style.width = `${(final1 / player1.maxScore) * 100}%`;
                     document.getElementById('battle-gauge2').style.width = `${(final2 / player2.maxScore) * 100}%`;
 
-                    // 勝敗メッセージを表示
-                    if (final1 > final2) {
-                        document.getElementById('battle-instruct').textContent = '1Pの勝ち！';
-                    } else if (final2 > final1) {
-                        document.getElementById('battle-instruct').textContent = '2Pの勝ち！';
-                    } else {
-                        document.getElementById('battle-instruct').textContent = '引き分け！';
+                    // ダメージ集計テキスト（1Pが与えた = damageToP2, 2Pが与えた = damageToP1）
+                    const dmgText = `1Pのダメージ: ${Math.round(damageToP2).toLocaleString()} / 2Pのダメージ: ${Math.round(damageToP1).toLocaleString()}`;
+
+                    // 勝敗メッセージ＋ダメージを表示
+                    const instructEl = document.getElementById('battle-instruct');
+                    if (instructEl) {
+                        if (final1 > final2) {
+                            instructEl.innerHTML = `1Pの勝ち！<br>${dmgText}`;
+                        } else if (final2 > final1) {
+                            instructEl.innerHTML = `2Pの勝ち！<br>${dmgText}`;
+                        } else {
+                            instructEl.innerHTML = `引き分け！<br>${dmgText}`;
+                        }
                     }
                     // (注: この後、結果画面 #screen-battle-result へ自動遷移するロジックはここにはない)
                     // (showBattleResult 関数は別途呼び出す必要がある)
                 }
             }, 1000); // 1秒ごと
-        };        // --- 連打エリアのクリックイベント ---
+        };
+
+        // --- 連打エリアのクリックイベント ---
         document.getElementById('battle-mouse').onclick = function(event) {
             if (!isBattleActive) return; // 連打受付中じゃなければ何もしない
 
             // 波紋エフェクトを作成
             createRippleEffect(event, this);
 
+            // 1回ごとの基礎ダメージ（500〜1000の乱数）
+            const baseDamage = 500 + Math.floor(Math.random() * 501); // 500〜1000
+            let bonus = 0;
+
             if (phase === 1) {
-                clickCount1++; // 1Pのターンなら P1のカウントを増やす
+                // 1Pのターン → P2にダメージ
+                clickCount1++; // 1Pのクリック数カウント
+                if (clickCount1 % 10 === 0) {
+                    bonus = 2000; // 10回ごとにボーナス
+                }
+                damageToP2 += baseDamage + bonus;
                 document.getElementById('click-counter').textContent = `クリック数: ${clickCount1}`;
             } else if (phase === 2) {
-                clickCount2++; // 2Pのターンなら P2のカウントを増やす
+                // 2Pのターン → P1にダメージ
+                clickCount2++; // 2Pのクリック数カウント
+                if (clickCount2 % 10 === 0) {
+                    bonus = 2000;
+                }
+                damageToP1 += baseDamage + bonus;
                 document.getElementById('click-counter').textContent = `クリック数: ${clickCount2}`;
             }
         };

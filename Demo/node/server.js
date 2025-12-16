@@ -1,4 +1,4 @@
-// Demo POWER SCAN Node server
+// Demo JSOK Node server
 // - WebSocket: landmarks -> compute stats & append to CSV (power_scan_log.csv)
 // - REST API: ranking CSV (save/get/delete) + music list, and image save/delete
 
@@ -134,7 +134,7 @@ function deleteImageIfExists(fileName) {
   try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch {}
 }
 
-// --- WS: power scan logging
+// --- WS: JSOK logging
 function dist2D(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 function calcStats(landmarks) {
   if (!Array.isArray(landmarks) || landmarks.length < 29) {
