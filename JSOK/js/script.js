@@ -609,8 +609,8 @@ try { window.battleState = battleState; } catch(e){}
             // 波紋エフェクトを作成
             createRippleEffect(event, this);
 
-            // 1回ごとの基礎ダメージ（500〜1000の乱数）
-            const baseDamage = 500 + Math.floor(Math.random() * 501); // 500〜1000
+            // 1回ごとの基礎ダメージ（1000〜1500の乱数）
+	            const baseDamage = 1000 + Math.floor(Math.random() * 501); // 1000〜1500
             let bonus = 0;
 
             if (phase === 1) {
