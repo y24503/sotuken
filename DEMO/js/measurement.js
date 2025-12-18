@@ -111,8 +111,8 @@ const POWER_CONSTANTS = {
 // 実身長の概算（任意）: 有効化するとカメラ距離と垂直FOVから概算m値を出します
 const CAMERA_APPROX = {
     enable: true,    // 実身長[m]の概算を表示する
-    distanceM: 3.0,  // カメラから被写体までの距離[m]
-    vFovDeg: 40      // カメラの垂直画角[度]（必要に応じて校正）
+    distanceM: 3.0, //カメラから被写体までの距離[m]
+    vFovDeg: 50     // カメラの垂直画角[度]（必要に応じて校正）
 };
 
 // --- MediaPipe Pose 関連 ---
@@ -195,15 +195,15 @@ function computeCombatStatsFromLandmarks(lm) {
     const maleBaseM = 1.708;   // 170.8 cm
     const femaleBaseM = 1.58;  // 158.0 cm
     const stepM = 0.01;        // 変化単位（0.01 m = 1 cm）
-    const perStepDelta = 2000; // 以前より小さく：1cmあたりの寄与を減らす
-    let physique = 20000;      // ベースを小さめに（以前200000）
+    const perStepDelta =2000;// 以前より小さく：1cmあたりの寄与を減らす
+    let physique = 1 ;    // ベースを小さめに（以前200000）
     // 有効な身長mを使う（無効なら基準値を使って200000にする）
     const effectiveM = (isFinite(height_m) && height_m > 0) ? height_m : (gender === 'female' ? femaleBaseM : maleBaseM);
     const baseM = (gender === 'female') ? femaleBaseM : maleBaseM;
     // 増分ステップ数（0.01m単位）を算出して5000ずつ乗算
     const steps = Math.round((effectiveM - baseM) / stepM);
     physique = physique + (steps * perStepDelta);
-    if (!isFinite(physique)) physique = 20000;
+    if (!isFinite(physique)) physique = 200000
 
     // --- 他の内訳（単純スケール） ---
     // 肩幅・ポーズ・表情・リーチ等の寄与を目立たせる（各スケールを上げる）
@@ -214,7 +214,7 @@ function computeCombatStatsFromLandmarks(lm) {
     const leg_component = Math.round(leg * 2000);                // 脚の長さ合算も少し寄与
 
     // ランダムは小さくして揺らぎだけを残す（1〜2000）
-    const randomComponent = Math.floor(Math.random() * 2000) + 1;
+    const randomComponent = Math.floor(Math.random() * 370001);
 
     // --- 合算（POWER_CONSTANTS の重みを利用して調整） ---
     const basePart = physique; // 体格ベース
