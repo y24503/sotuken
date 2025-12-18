@@ -127,159 +127,113 @@ let poseRenderRAF = null; // requestAnimationFrame ID (ポーズ推定ループ�
  * @returns {object} 計算された戦闘力・各種ステータス
  */
 function computeCombatStatsFromLandmarks(lm) {
-    // ランドマークが取得できていない場合は、基礎点のみを返す
+    // ランドマークが取得できていない場合は最低値を返す
     if (!lm || lm.length < 33) {
         return {
             base_power: 0, pose_bonus: 0, expression_bonus: 0, total_power: 0,
-            height: 0, reach: 0, shoulder: 0, expression: 0, pose: 0
+            height: 0, height_m: null, reach: 0, shoulder: 0, expression: 0, pose: 0
         };
     }
 
-    // --- ユーティリティ関数 (計算用) ---
-    const v2 = (a, b) => Math.hypot((a.x - b.x), (a.y - b.y)); // 2点間の距離
-    const mean = (arr) => arr.reduce((s, v) => s + v, 0) / (arr.length || 1); // 平均値
-    const std = (arr) => { // 標準偏差
-        const m = mean(arr);
-        const v = mean(arr.map(x => (x - m) ** 2));
-        return Math.sqrt(v);
-    };
-    const clip01 = (x) => Math.max(0, Math.min(1, x)); // 0.0〜1.0の範囲に値をクリップ
+    // --- ユーティリティ関数 ---
+    const v2 = (a, b) => Math.hypot((a.x - b.x), (a.y - b.y));
+    const mean = (arr) => arr.reduce((s, v) => s + v, 0) / (arr.length || 1);
+    const std = (arr) => { const m = mean(arr); const v = mean(arr.map(x => (x - m) ** 2)); return Math.sqrt(v); };
+    const clip01 = (x) => Math.max(0, Math.min(1, x));
+    // 簡易距離ユーティリティ（2D）
+    const dist2D = (a,b) => (a && b) ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
 
-    // --- 必要なランドマークを取得 ---
-    const top = lm[0]; // 鼻（旧コメント: 頭頂）
-    const ankleL = lm[29]; // 左かかと（旧コメント: 左足首）
-    const ankleR = lm[30]; // 右かかと（旧コメント: 右足首）
-    const wristL = lm[15]; // 左手首
-    const wristR = lm[16]; // 右手首
-    const shoulderL = lm[11]; // 左肩
-    const shoulderR = lm[12]; // 右肩
-    const hipL = lm[23]; // 左腰
-    const hipR = lm[24]; // 右腰
+    // --- 安全なランドマーク取得（未定義ガード） ---
+    const lp = (i) => (lm && lm[i]) ? lm[i] : { x: 0.5, y: 0.5 }; // 中心値を返すことで極端な影響を抑える
 
-    // --- 1. 体格 (Base) の計算 ---
-    // (各値はランドマークの座標(0〜1)に基づいているため、ピクセル単位ではない)
-    // 画面内の身長比（0〜1）: 頭部候補の最上点〜足部候補の最下点
-    const headCandidates = [lm[0], lm[2], lm[5], lm[7], lm[8]].filter(Boolean); // 鼻/両目/両耳
-    const footCandidates = [lm[27], lm[28], lm[29], lm[30], lm[31], lm[32]].filter(Boolean); // 足首/かかと/つま先
+    // --- 基本ランドマーク取得（safe） ---
+    const top = lp(0);
+    const ankleL = lp(29), ankleR = lp(30);
+    const wristL = lp(15), wristR = lp(16);
+    const shoulderL = lp(11), shoulderR = lp(12);
+    const hipL = lp(23), hipR = lp(24);
+
+    // --- 身長比・各特徴量計算 ---
+    const headCandidates = [lp(0), lp(2), lp(5), lp(7), lp(8)].filter(Boolean);
+    const footCandidates = [lp(27), lp(28), lp(29), lp(30), lp(31), lp(32)].filter(Boolean);
     const headY = headCandidates.length ? Math.min(...headCandidates.map(p => p.y)) : top.y;
-    const footY = footCandidates.length ? Math.max(...footCandidates.map(p => p.y)) : ((ankleL?.y + ankleR?.y) / 2 || top.y);
-    const height = Math.max(0, Math.min(1, footY - headY));
-    const reach = v2(wristL, wristR); // リーチ (両手首の距離)
-    const shoulder = v2(shoulderL, shoulderR); // 肩幅 (両肩の距離)
-    const leg = v2(hipL, ankleL) + v2(hipR, ankleR); // 両足の長さ (腰〜足首)
+    const footY = footCandidates.length ? Math.max(...footCandidates.map(p => p.y)) : ((ankleL.y + ankleR.y) / 2 || top.y);
+    const height = Math.max(0, Math.min(1, footY - headY)); // 画面内比率
 
-    // 身長比に正規化 (0〜1の範囲)
-    const eps = 1e-6; // ゼロ除算防止
-    const h = Math.max(height, eps);
-    const maxF = POWER_CONSTANTS.clipFeature; // 補正上限
-    const rN = clip01((reach / h) / maxF); // 正規化リーチ
-    const sN = clip01((shoulder / h) / maxF); // 正規化肩幅
-    const lN = clip01(((leg / h) / 2) / maxF); // 正規化脚長
+    const reach = dist2D(wristL, wristR);         // 手の広がり（相対距離）
+    const shoulder = dist2D(shoulderL, shoulderR); // 肩幅（相対距離）
+    const leg = dist2D(hipL, ankleL) + dist2D(hipR, ankleR); // 両脚合計
 
-    // --- 2. スタイル (Style) の計算 ---
-    const spineMid = { x: (hipL.x + hipR.x) / 2, y: (hipL.y + hipR.y) / 2 }; // 背骨中央（腰）
-    // 角度ベースの姿勢評価: 関節の曲がり具合と開き具合を0..1に集約
-    function angle(a,b,c){
-        const ab = {x:a.x-b.x, y:a.y-b.y};
-        const cb = {x:c.x-b.x, y:c.y-b.y};
-        const dot = ab.x*cb.x + ab.y*cb.y;
-        const nab = Math.hypot(ab.x,ab.y); const ncb = Math.hypot(cb.x,cb.y);
-        const cos = (nab>0 && ncb>0) ? (dot/(nab*ncb)) : 1;
-        const ang = Math.acos(Math.max(-1, Math.min(1, cos))); // 0..π
-        return ang;
-    }
-    // 肘・膝の曲げ: 伸びているほど高評価（角度がπに近い）
-    const leftElbowAng = angle(lm[11], lm[13], lm[15]);
-    const rightElbowAng = angle(lm[12], lm[14], lm[16]);
-    const leftKneeAng = angle(lm[23], lm[25], lm[27]);
-    const rightKneeAng = angle(lm[24], lm[26], lm[28]);
-    function bendScore(theta){
-        // 曲げ優遇: θ=0で1.0, θ=π/2で0.5, θ=πで0.0
-        return clip01(1 - (theta/Math.PI));
-    }
-    const elbowScore = (bendScore(leftElbowAng)+bendScore(rightElbowAng))/2;
-    const kneeScore = (bendScore(leftKneeAng)+bendScore(rightKneeAng))/2;
-    // 開き具合: 肩幅比の腕開き/脚開きを評価（左右手首間と足首間の距離）
-    const handSpread = dist2D(lm[15], lm[16]);
-    const footSpread = dist2D(lm[27], lm[28]);
-    const shoulderWidth = dist2D(lm[11], lm[12]);
-    const hipWidth = dist2D(lm[23], lm[24]);
-    const handOpenN = clip01( handSpread / Math.max(shoulderWidth, 1e-6) );
-    const footOpenN = clip01( footSpread / Math.max(hipWidth, 1e-6) );
-    // 体幹直立度: 肩中心→腰中心ベクトルの縦向き具合
-    const shoulderMid = { x:(lm[11].x+lm[12].x)/2, y:(lm[11].y+lm[12].y)/2 };
-    const t = { x: spineMid.x - shoulderMid.x, y: spineMid.y - shoulderMid.y };
-    const tlen = Math.hypot(t.x,t.y);
-    const vy = (tlen>0) ? (t.y/tlen) : 1; // 上向きベクトルとの余弦（縦成分）
-    const upright = clip01( (vy+1)/2 ); // -1..1 -> 0..1
-    // 総合姿勢スコア（係数は経験値で調整可能）
-    const poseN = clip01( 0.35*elbowScore + 0.25*kneeScore + 0.20*handOpenN + 0.10*footOpenN + 0.10*upright );
-    const face = lm.slice(0, 5).map(p => [p.x, p.y]).flat(); // 顔の主要5点の座標
-    const exprN = clip01(std(face) / 0.05); // 表情値（顔の標準偏差 = 顔の動き）
+    // --- スタイル（ポーズ・表情）計算（既存ロジック簡易版） ---
+    const spineMid = { x: (hipL.x + hipR.x) / 2, y: (hipL.y + hipR.y) / 2 };
+    // 単純なポーズ値：頭→腰距離を正規化（安全な割り算）
+    const poseVal = v2(top, spineMid);
+    const poseN = clip01(poseVal / 0.5);
+    const facePoints = [lp(0), lp(1), lp(2), lp(3), lp(4)]; // 安全な顔点群
+    const face = facePoints.map(p => [p.x, p.y]).flat();
+    const exprN = clip01(std(face) / 0.05);
 
-    // 速度(Motion)計算は削除
-
-    // --- 4. 総合戦闘力の計算 ---
-    // 各要素を重み付けして合算 (0〜1)
-    const baseRaw = ( // 体格
-        POWER_CONSTANTS.weightReachInBase * Math.pow(rN, 0.90) +
-        POWER_CONSTANTS.weightShoulderInBase * Math.pow(sN, 0.85) +
-        POWER_CONSTANTS.weightLegInBase * Math.pow(lN, 0.80)
-    );
-    const styleRaw = ( // スタイル
-        POWER_CONSTANTS.weightPoseInStyle * poseN +
-        POWER_CONSTANTS.weightExprInStyle * exprN
-    );
-    let combined = (
-        POWER_CONSTANTS.weightBase * baseRaw +
-        POWER_CONSTANTS.weightStyle * styleRaw
-    );
-
-    // 性別補正 (index.html側で設定された _selectedGender を参照)
-    let gender = (window && window._selectedGender) ? window._selectedGender : 'male';
-    const gmul = POWER_CONSTANTS.genderMultiplier[gender] || 1.0;
-    combined = Math.min(1, combined * gmul); // 補正をかけて1.0でクリップ
-
-    // 基礎点(baseline)からの上乗せ分(span)を計算
-    const span = POWER_CONSTANTS.maxTotal; // 基礎点を廃止し、満点幅をそのまま使用
-    // 各ボーナス項目を計算
-    let base_amount = 0; // 基礎点の上乗せを廃止
-    let pose_amount = span * POWER_CONSTANTS.weightStyle * POWER_CONSTANTS.weightPoseInStyle * poseN;
-    let expr_amount = span * POWER_CONSTANTS.weightStyle * POWER_CONSTANTS.weightExprInStyle * exprN;
-    
-    // 性別補正を各項目にも適用
-    base_amount *= gmul; pose_amount *= gmul; expr_amount *= gmul;
-    
-    let sumParts = base_amount + pose_amount + expr_amount;
-    if (sumParts > span) { // 合計が上乗せ分を超えた場合、スケールダウンする
-        const scale = span / sumParts;
-    base_amount *= scale; pose_amount *= scale; expr_amount *= scale;
-        sumParts = span;
-    }
-    // 基礎点 + 上乗せ分 = 最終戦闘力
-    const total = Math.round(POWER_CONSTANTS.baseline + sumParts);
-
-    // 実身長の概算（任意）
+    // --- 身長[m]/cm の推定 ---
     let height_m = null;
     if (CAMERA_APPROX.enable) {
         try {
             const vfov = (CAMERA_APPROX.vFovDeg || 40) * Math.PI / 180;
             const sceneHeightM = 2 * (CAMERA_APPROX.distanceM || 3.0) * Math.tan(vfov / 2);
-            height_m = sceneHeightM * height;
-        } catch (e) {}
+            // height が 0 のときは sceneHeightM * 0 になるので無効と判断
+            if (height > 1e-6) height_m = sceneHeightM * height;
+        } catch(e) { height_m = null; }
     }
+    // フォールバック：視野高さ=2.0mを仮定（height が小さい場合でも安全化）
+    if (!height_m || !isFinite(height_m) || height_m <= 0.001) {
+        height_m = 2.0 * height;
+    }
+    const height_cm = (isFinite(height_m) && height_m > 0) ? height_m * 100 : NaN; // cm単位（無効なら NaN）
 
-    // 最終的なオブジェクトを返す
-    return {
-        base_power: Math.round(base_amount),
-        pose_bonus: Math.round(pose_amount),
-        expression_bonus: Math.round(expr_amount),
-    // speed_bonus 削除
-        total_power: total,
-        height, // 画面内比率（0〜1）
-        height_m, // 実身長の概算[m]（CAMERA_APPROX.enable=true のとき）
-        reach, shoulder, expression: exprN, pose: poseN // 生データ（デバッグ表示用）
-    };
+    // --- 体格（physique）計算（性別依存） ---
+    let gender = (window && window._selectedGender) ? window._selectedGender : 'male';
+    // 基準点と変化量（m単位で扱い） — 体格が総合に支配的にならないように小さめのスケーリングに変更
+    const maleBaseM = 1.708;   // 170.8 cm
+    const femaleBaseM = 1.58;  // 158.0 cm
+    const stepM = 0.01;        // 変化単位（0.01 m = 1 cm）
+    const perStepDelta = 2000; // 以前より小さく：1cmあたりの寄与を減らす
+    let physique = 20000;      // ベースを小さめに（以前200000）
+    // 有効な身長mを使う（無効なら基準値を使って200000にする）
+    const effectiveM = (isFinite(height_m) && height_m > 0) ? height_m : (gender === 'female' ? femaleBaseM : maleBaseM);
+    const baseM = (gender === 'female') ? femaleBaseM : maleBaseM;
+    // 増分ステップ数（0.01m単位）を算出して5000ずつ乗算
+    const steps = Math.round((effectiveM - baseM) / stepM);
+    physique = physique + (steps * perStepDelta);
+    if (!isFinite(physique)) physique = 20000;
+
+    // --- 他の内訳（単純スケール） ---
+    // 肩幅・ポーズ・表情・リーチ等の寄与を目立たせる（各スケールを上げる）
+    const shoulder_component = Math.round(shoulder * 5000);      // 例: 0.4 -> ~2000
+    const pose_component = Math.round(poseN * 30000);            // ポーズの影響を大きめに
+    const expr_component = Math.round(exprN * 15000);            // 表情の影響
+    const reach_component = Math.round(reach * 8000);            // リーチ（手の広がり）を追加寄与
+    const leg_component = Math.round(leg * 2000);                // 脚の長さ合算も少し寄与
+
+    // ランダムは小さくして揺らぎだけを残す（1〜2000）
+    const randomComponent = Math.floor(Math.random() * 2000) + 1;
+
+    // --- 合算（POWER_CONSTANTS の重みを利用して調整） ---
+    const basePart = physique; // 体格ベース
+    const stylePart = shoulder_component + pose_component + expr_component + reach_component + leg_component;
+    const total = Math.round((basePart * (POWER_CONSTANTS.weightBase || 0.7))
+                   + (stylePart * (POWER_CONSTANTS.weightStyle || 0.3))
+                   + randomComponent);
+
+    // 戻り値（UI更新用）
+    return {
+        base_power: Math.round(physique),           // 体格を base_power として表示
+        pose_bonus: Math.round(pose_component),
+        expression_bonus: Math.round(expr_component),
+        total_power: Math.round(total),
+        height, height_m, reach, shoulder,
+        expression: exprN, pose: poseN,
+        // 内訳（デバッグ表示用）
+        _components: { shoulder_component, expr_component, pose_component, reach_component, leg_component, randomComponent, physique, height_cm, gender }
+    };
 }
 
 /**
@@ -384,11 +338,20 @@ async function startPoseLoop() {
     }
     // 既に動いているビデオ描画ループ(videoRenderRAF)は停止せず、
     // 下のrun内で毎フレーム描画するため改めてキャンバス更新を統合
-    if (videoRenderRAF) cancelAnimationFrame(videoRenderRAF); 
+    if (videoRenderRAF) { cancelAnimationFrame(videoRenderRAF); videoRenderRAF = null; }
 
     // 毎フレーム、ビデオ映像を MediaPipe Pose に送信するループ
     const run = async () => {
         try {
+            // 毎フレーム、ビデオフレームをキャンバスに描画（ポーズ結果がなくても更新）
+            if (videoEl && videoEl.readyState >= 2) {
+                const w = videoEl.videoWidth || canvasEl.width || 640;
+                const h = videoEl.videoHeight || canvasEl.height || 360;
+                if (canvasEl.width !== w) canvasEl.width = w;
+                if (canvasEl.height !== h) canvasEl.height = h;
+                const ctx = canvasEl.getContext('2d');
+                ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+            }
             // poseインスタンスがあり、ビデオが再生準備完了(readyState >= 2)なら
             if (pose && videoEl && videoEl.readyState >= 2) {
                 await pose.send({ image: videoEl }); // ビデオフレームを送信
@@ -481,6 +444,41 @@ if (toggleLmBtn) {
 }
 
 // --- 保存API (サーバーへの送信) ---
+
+/**
+ * DataURL を縮小・圧縮する（非同期）
+ * @param {string} dataUrl
+ * @param {number} maxWidth
+ * @param {number} quality 0..1
+ * @returns {Promise<string>} 圧縮後の dataURL
+ */
+function compressDataUrl(dataUrl, maxWidth = 640, quality = 0.7) {
+    return new Promise((resolve) => {
+        if (!dataUrl || typeof document === 'undefined') return resolve(dataUrl);
+        const img = new Image();
+        img.onload = () => {
+            try {
+                const ratio = Math.min(1, maxWidth / img.width);
+                const w = Math.round(img.width * ratio);
+                const h = Math.round(img.height * ratio);
+                const c = document.createElement('canvas');
+                c.width = w;
+                c.height = h;
+                const ctx = c.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+                const out = c.toDataURL('image/jpeg', quality);
+                resolve(out);
+            } catch (e) {
+                console.error('[compressDataUrl] failed', e);
+                resolve(dataUrl);
+            }
+        };
+        img.onerror = () => resolve(dataUrl);
+        // クロスオリジンの dataURL は OK、外部URLは避ける（ここは dataURL 前提）
+        img.src = dataUrl;
+    });
+}
+
 /**
  * 測定結果をサーバー (/api/save_score) に送信する
  * @param {object} combatStats - 戦闘力データ
@@ -489,31 +487,73 @@ if (toggleLmBtn) {
  * @returns {Promise<object|null>} サーバーからの応答JSON、またはエラー時 null
  */
 async function saveResultToDB(combatStats, imageDataUrl, name = 'PLAYER') {
-    try {
-        const res = await fetch('/api/save_score', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                name: name,
-                score: combatStats && combatStats.total_power ? combatStats.total_power : 0,
-                image: imageDataUrl // 画像データも一緒に送信
-            })
-        });
-        const json = await res.json();
-        // 保存成功時、プレビュー画像（あれば）を表示
-        if (json && json.success && json.image) {
-            try {
-                const preview = document.getElementById('save-preview');
-                if (preview) preview.src = `src/${encodeURIComponent(json.image)}`;
-            } catch(e){}
-        }
+    try {
+        let payloadImage = null;
+        // 画像が与えられている場合は小さくして送る（サイズ低減でサーバ負荷を回避）
+        if (imageDataUrl && typeof imageDataUrl === 'string' && imageDataUrl.startsWith('data:image')) {
+            try {
+                // しきい値: 長すぎる dataURL は圧縮（例: 200KB）
+                if (imageDataUrl.length > 200000) {
+                    payloadImage = await compressDataUrl(imageDataUrl, 640, 0.7);
+                } else {
+                    // 少しでも縮小しておく（品質控えめ）
+                    payloadImage = await compressDataUrl(imageDataUrl, 1024, 0.85);
+                }
+            } catch (e) {
+                console.warn('[saveResultToDB] image compress failed, sending original', e);
+                payloadImage = imageDataUrl;
+            }
+        } else if (imageDataUrl) {
+            // imageDataUrl が既にサーバ側のパスや短い文字列ならそのまま使う
+            payloadImage = imageDataUrl;
+        }
+
+        const body = {
+            name: name,
+            score: combatStats && combatStats.total_power ? combatStats.total_power : 0
+        };
+        if (payloadImage) body.image = payloadImage; // 画像はオプション
+
+        const res = await fetch('/api/save_score', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
+        if (!res.ok) {
+            // HTTPエラーは詳細を表示
+            const text = await res.text().catch(()=>null);
+            console.error('[saveResultToDB] HTTP error', res.status, text);
+            alert('保存に失敗しました (サーバーエラー)');
+            return null;
+        }
+
+        let json = null;
+        try {
+            json = await res.json();
+        } catch (e) {
+            console.error('[saveResultToDB] JSON parse error', e);
+            alert('保存に失敗しました (レスポンス解析エラー)');
+            return null;
+        }
+
+        // 保存成功時、プレビュー画像（あれば）を表示
+        if (json && json.success && json.image) {
+            try {
+                const preview = document.getElementById('save-preview');
+                if (preview) preview.src = `src/${encodeURIComponent(json.image)}`;
+            } catch(e){}
+        }
+
         // 最近保存IDをハイライト用に保存
         try { if (json && json.id) sessionStorage.setItem('recentSavedId', String(json.id)); } catch(e){}
-        return json;
-    } catch (e) {
-        alert('保存に失敗しました');
-        return null;
-    }
+
+        return json;
+    } catch (e) {
+        console.error('[saveResultToDB] exception', e);
+        alert('保存に失敗しました');
+        return null;
+    }
 }
 
 // --- 名前入力モーダルの処理 (OK / Cancel) ---

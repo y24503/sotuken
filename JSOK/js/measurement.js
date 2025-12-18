@@ -127,15 +127,11 @@ let poseRenderRAF = null; // requestAnimationFrame ID (ポーズ推定ループ�
  * @returns {object} 計算された戦闘力・各種ステータス
  */
 function computeCombatStatsFromLandmarks(lm) {
-	// ランドマークが取得できていない場合は0で返す
+    // ランドマークが取得できていない場合は、基礎点のみを返す
     if (!lm || lm.length < 33) {
         return {
             base_power: 0, pose_bonus: 0, expression_bonus: 0, total_power: 0,
-            height: 0, reach: 0, shoulder: 0, expression: 0, pose: 0,
-            // ML用特徴量も0で埋めておく
-            reach_norm: 0, shoulder_norm: 0, leg_norm: 0,
-            stance_w: 0,
-            elbowL_deg: 0, elbowR_deg: 0, kneeL_deg: 0, kneeR_deg: 0
+            height: 0, reach: 0, shoulder: 0, expression: 0, pose: 0
         };
     }
 
@@ -220,20 +216,9 @@ function computeCombatStatsFromLandmarks(lm) {
     const upright = clip01( (vy+1)/2 ); // -1..1 -> 0..1
     // 総合姿勢スコア（係数は経験値で調整可能）
     const poseN = clip01( 0.35*elbowScore + 0.25*kneeScore + 0.20*handOpenN + 0.10*footOpenN + 0.10*upright );
-
-    // 立ち幅指標（ML用）：足の開き度合いをそのまま使う
-    const stance_w = footOpenN;
-
-    // 関節角度を度数に変換（ML用）
-    const toDeg = (rad) => rad * 180 / Math.PI;
-    const elbowL_deg = toDeg(leftElbowAng);
-    const elbowR_deg = toDeg(rightElbowAng);
-    const kneeL_deg = toDeg(leftKneeAng);
-    const kneeR_deg = toDeg(rightKneeAng);
     const face = lm.slice(0, 5).map(p => [p.x, p.y]).flat(); // 顔の主要5点の座標
     const exprN = clip01(std(face) / 0.05); // 表情値（顔の標準偏差 = 顔の動き）
 
-    // 速度(Motion)計算は削除
 
     // --- 4. 総合戦闘力の計算 ---
     // 各要素を重み付けして合算 (0〜1)
@@ -294,16 +279,7 @@ function computeCombatStatsFromLandmarks(lm) {
         total_power: total,
         height, // 画面内比率（0〜1）
         height_m, // 実身長の概算[m]（CAMERA_APPROX.enable=true のとき）
-        reach, shoulder, expression: exprN, pose: poseN, // 生データ（デバッグ表示用）
-        // ML用特徴量（CSVの列と合わせる）
-        reach_norm: rN,
-        shoulder_norm: sN,
-        leg_norm: lN,
-        stance_w,
-        elbowL_deg,
-        elbowR_deg,
-        kneeL_deg,
-        kneeR_deg
+        reach, shoulder, expression: exprN, pose: poseN // 生データ（デバッグ表示用）
     };
 }
 
@@ -550,34 +526,6 @@ async function saveResultToDB(combatStats, imageDataUrl, name = 'PLAYER') {
     }
 }
 
-// --- 学習用特徴量のログ送信 ---
-async function logFeaturesForTraining(combatStats) {
-    if (!combatStats) return;
-    try {
-        const payload = {
-            reach_norm: combatStats.reach_norm ?? 0,
-            shoulder_norm: combatStats.shoulder_norm ?? 0,
-            leg_norm: combatStats.leg_norm ?? 0,
-            poseN: combatStats.pose ?? 0,
-            exprN: combatStats.expression ?? 0,
-            stance_w: combatStats.stance_w ?? 0,
-            elbowL_deg: combatStats.elbowL_deg ?? 0,
-            elbowR_deg: combatStats.elbowR_deg ?? 0,
-            kneeL_deg: combatStats.kneeL_deg ?? 0,
-            kneeR_deg: combatStats.kneeR_deg ?? 0,
-            // ラベルには現在のルールベース戦闘力をそのまま使う
-            label: combatStats.total_power ?? 0
-        };
-        await fetch('/api/log_features', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-    } catch(e) {
-        console.warn('log_features failed', e);
-    }
-}
-
 // --- 名前入力モーダルの処理 (OK / Cancel) ---
 
 // OKボタン: 2P対戦フローの核心
@@ -585,11 +533,8 @@ btnNameOk && btnNameOk.addEventListener('click', async () => {
     const name = inputPlayerName.value.trim() || 'PLAYER'; // 名前を取得
     nameModal.classList.add('hidden'); // モーダルを閉じる
 
-    // データをサーバーに保存（ランキング登録）
-    const currentStats = lastCombatStats || { total_power: POWER_CONSTANTS.baseline };
-    const saveJson = await saveResultToDB(currentStats, lastSnapshotDataUrl || '', name);
-    // 学習用に特徴量をCSVへ1行追加
-    logFeaturesForTraining(currentStats);
+    // データをサーバーに保存（ランキング登録）
+    const saveJson = await saveResultToDB(lastCombatStats || { total_power: POWER_CONSTANTS.baseline }, lastSnapshotDataUrl || '', name);
 
     // --- 2人測定モード (2pmeasure) の判定 ---
     let bs = {}; // battleState
