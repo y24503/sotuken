@@ -26,6 +26,8 @@ const btnExit = document.getElementById('btn-back-to-title-2'); // 終了(EXIT)�
 let measureTimeout = null; // 測定タイマー (10秒カウントダウン用)
 let lastSnapshotDataUrl = null; // 最後に撮影したスナップショット (Data URL形式)
 let lastCombatStats = null; // 最後に計算された戦闘力データ
+let snapshotCombatStats = null; // 写真撮影タイミングで確定させた戦闘力
+let measurementLocked = false; // 写真撮影後は戦闘力を更新しないためのロック
 let showLandmarks = false; // ランドマーク表示フラグ（反転機能は削除）
 const flipLandmarksHorizontally = true; // 画面上の体の向きとランドマークが逆の場合は true で左右反転描画
 
@@ -342,7 +344,8 @@ async function initPose() {
     pose = await createPose({
         base,
         onResults: (results) => {
-        if (results && results.poseLandmarks) {
+        // 測定中のみ戦闘力を更新し、撮影後は値を固定する
+        if (!measurementLocked && results && results.poseLandmarks) {
             const stats = computeCombatStatsFromLandmarks(results.poseLandmarks);
             updateStats(stats);
         }
@@ -456,6 +459,10 @@ function stopAll() {
 
 // STARTボタン: 10秒タイマーを開始し、完了後に名前入力モーダルを表示
 btnStart && btnStart.addEventListener('click', () => {
+    // 新しい測定を開始するたびにロックと確定値をリセット
+    measurementLocked = false;
+    snapshotCombatStats = null;
+
     btnStart.disabled = true; // ボタンを無効化
     btnStart.textContent = 'MEASURING...';
 
@@ -483,7 +490,9 @@ btnStart && btnStart.addEventListener('click', () => {
             // 10秒経過時点の <canvas> の内容を画像(jpeg)として取得
             const dataUrl = canvasEl.toDataURL('image/jpeg');
             lastSnapshotDataUrl = dataUrl; // グローバル変数に保存
-            // 10秒経過時点の戦闘力(lastCombatStats)は、updateStats関数によって既にグローバル変数に保存されている
+            // 10秒経過時点の戦闘力(lastCombatStats)を、このタイミングで確定させる
+            snapshotCombatStats = lastCombatStats ? { ...lastCombatStats } : null;
+            measurementLocked = true; // 以降は戦闘力を更新しない
         } catch(e){}
         
         // 名前入力モーダルを表示
@@ -534,13 +543,7 @@ async function saveResultToDB(combatStats, imageDataUrl, name = 'PLAYER') {
             })
         });
         const json = await res.json();
-        // 保存成功時、プレビュー画像（あれば）を表示
-        if (json && json.success && json.image) {
-            try {
-                const preview = document.getElementById('save-preview');
-                if (preview) preview.src = `src/${encodeURIComponent(json.image)}`;
-            } catch(e){}
-        }
+        // 保存成功時のプレビュー画像表示は廃止（名前入力時に画像を表示しない仕様）
         // 最近保存IDをハイライト用に保存
         try { if (json && json.id) sessionStorage.setItem('recentSavedId', String(json.id)); } catch(e){}
         return json;
@@ -586,7 +589,8 @@ btnNameOk && btnNameOk.addEventListener('click', async () => {
     nameModal.classList.add('hidden'); // モーダルを閉じる
 
     // データをサーバーに保存（ランキング登録）
-    const currentStats = lastCombatStats || { total_power: POWER_CONSTANTS.baseline };
+    // 写真撮影タイミングで確定させた戦闘力を優先して使用する
+    const currentStats = snapshotCombatStats || lastCombatStats || { total_power: POWER_CONSTANTS.baseline };
     const saveJson = await saveResultToDB(currentStats, lastSnapshotDataUrl || '', name);
     // 学習用に特徴量をCSVへ1行追加
     logFeaturesForTraining(currentStats);
