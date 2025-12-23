@@ -92,29 +92,18 @@ function getQueryParams() {
 
 // --- 戦闘力計算 ---
 
+// --- 戦闘力計算 ---
 // 戦闘力計算用の定数 (script.js と互換性のある最小限のコピー)
-// 速度要素を排除し、重みの重複を軽減した簡略版定数
 const POWER_CONSTANTS = {
-    baseline: 0,
-    maxTotal: 500000,
-    clipFeature: 1.6,
-    // 速度(weightMotion) を除いたため Base+Style が1になるよう再正規化
     weightBase: 0.70,
     weightStyle: 0.30,
-    // スタイル内部の比率・基礎内部の比率は既存維持
-    weightPoseInStyle: 0.60,
-    weightExprInStyle: 0.40,
-    weightReachInBase: 0.40,
-    weightShoulderInBase: 0.35,
-    weightLegInBase: 0.25,
-    genderMultiplier: { male: 1.00, female: 1.10 }
 };
 
 // 実身長の概算（任意）: 有効化するとカメラ距離と垂直FOVから概算m値を出します
 const CAMERA_APPROX = {
     enable: true,    // 実身長[m]の概算を表示する
-    distanceM: 3.0,  // カメラから被写体までの距離[m]
-    vFovDeg: 40      // カメラの垂直画角[度]（必要に応じて校正）
+    distanceM: 3.0, //カメラから被写体までの距離[m]
+    vFovDeg: 50     // カメラの垂直画角[度]（必要に応じて校正）
 };
 
 // --- MediaPipe Pose 関連 ---
@@ -129,184 +118,113 @@ let poseRenderRAF = null; // requestAnimationFrame ID (ポーズ推定ループ�
  * @returns {object} 計算された戦闘力・各種ステータス
  */
 function computeCombatStatsFromLandmarks(lm) {
-	// ランドマークが取得できていない場合は0で返す
+    // ランドマークが取得できていない場合は最低値を返す
     if (!lm || lm.length < 33) {
         return {
             base_power: 0, pose_bonus: 0, expression_bonus: 0, total_power: 0,
-            height: 0, reach: 0, shoulder: 0, expression: 0, pose: 0,
-            // ML用特徴量も0で埋めておく
-            reach_norm: 0, shoulder_norm: 0, leg_norm: 0,
-            stance_w: 0,
-            elbowL_deg: 0, elbowR_deg: 0, kneeL_deg: 0, kneeR_deg: 0
+            height: 0, height_m: null, reach: 0, shoulder: 0, expression: 0, pose: 0
         };
     }
 
-    // --- ユーティリティ関数 (計算用) ---
-    const v2 = (a, b) => Math.hypot((a.x - b.x), (a.y - b.y)); // 2点間の距離
-    const mean = (arr) => arr.reduce((s, v) => s + v, 0) / (arr.length || 1); // 平均値
-    const std = (arr) => { // 標準偏差
-        const m = mean(arr);
-        const v = mean(arr.map(x => (x - m) ** 2));
-        return Math.sqrt(v);
-    };
-    const clip01 = (x) => Math.max(0, Math.min(1, x)); // 0.0〜1.0の範囲に値をクリップ
+    // --- ユーティリティ関数 ---
+    const v2 = (a, b) => Math.hypot((a.x - b.x), (a.y - b.y));
+    const mean = (arr) => arr.reduce((s, v) => s + v, 0) / (arr.length || 1);
+    const std = (arr) => { const m = mean(arr); const v = mean(arr.map(x => (x - m) ** 2)); return Math.sqrt(v); };
+    const clip01 = (x) => Math.max(0, Math.min(1, x));
+    // 簡易距離ユーティリティ（2D）
+    const dist2D = (a,b) => (a && b) ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
 
-    // --- 必要なランドマークを取得 ---
-    const top = lm[0]; // 鼻（旧コメント: 頭頂）
-    const ankleL = lm[29]; // 左かかと（旧コメント: 左足首）
-    const ankleR = lm[30]; // 右かかと（旧コメント: 右足首）
-    const wristL = lm[15]; // 左手首
-    const wristR = lm[16]; // 右手首
-    const shoulderL = lm[11]; // 左肩
-    const shoulderR = lm[12]; // 右肩
-    const hipL = lm[23]; // 左腰
-    const hipR = lm[24]; // 右腰
+    // --- 安全なランドマーク取得（未定義ガード） ---
+    const lp = (i) => (lm && lm[i]) ? lm[i] : { x: 0.5, y: 0.5 }; // 中心値を返すことで極端な影響を抑える
 
-    // --- 1. 体格 (Base) の計算 ---
-    // (各値はランドマークの座標(0〜1)に基づいているため、ピクセル単位ではない)
-    // 画面内の身長比（0〜1）: 頭部候補の最上点〜足部候補の最下点
-    const headCandidates = [lm[0], lm[2], lm[5], lm[7], lm[8]].filter(Boolean); // 鼻/両目/両耳
-    const footCandidates = [lm[27], lm[28], lm[29], lm[30], lm[31], lm[32]].filter(Boolean); // 足首/かかと/つま先
+    // --- 基本ランドマーク取得（safe） ---
+    const top = lp(0);
+    const ankleL = lp(29), ankleR = lp(30);
+    const wristL = lp(15), wristR = lp(16);
+    const shoulderL = lp(11), shoulderR = lp(12);
+    const hipL = lp(23), hipR = lp(24);
+
+    // --- 身長比・各特徴量計算 ---
+    const headCandidates = [lp(0), lp(2), lp(5), lp(7), lp(8)].filter(Boolean);
+    const footCandidates = [lp(27), lp(28), lp(29), lp(30), lp(31), lp(32)].filter(Boolean);
     const headY = headCandidates.length ? Math.min(...headCandidates.map(p => p.y)) : top.y;
-    const footY = footCandidates.length ? Math.max(...footCandidates.map(p => p.y)) : ((ankleL?.y + ankleR?.y) / 2 || top.y);
-    const height = Math.max(0, Math.min(1, footY - headY));
-    const reach = v2(wristL, wristR); // リーチ (両手首の距離)
-    const shoulder = v2(shoulderL, shoulderR); // 肩幅 (両肩の距離)
-    const leg = v2(hipL, ankleL) + v2(hipR, ankleR); // 両足の長さ (腰〜足首)
+    const footY = footCandidates.length ? Math.max(...footCandidates.map(p => p.y)) : ((ankleL.y + ankleR.y) / 2 || top.y);
+    const height = Math.max(0, Math.min(1, footY - headY)); // 画面内比率
 
-    // 身長で割る正規化はやめて、画面上の大きさそのものと身長の大きさで体格差を強調する
-    // height は 0〜1 の範囲（画面内での見かけの身長比）
-    const sizeN = clip01(height); // そのまま「大きさ係数」として利用
-    const maxF = POWER_CONSTANTS.clipFeature; // 補正上限（スケール用）
-    // リーチ・肩幅・脚の長さに sizeN を掛けることで、大柄な人ほど有利になるようにする
-    const rN = clip01((reach * sizeN) / maxF);      // 体格込みリーチ
-    const sN = clip01((shoulder * sizeN) / maxF);   // 体格込み肩幅
-    const lN = clip01(((leg * sizeN) / 2) / maxF);  // 体格込み脚長（左右平均）
+    const reach = dist2D(wristL, wristR);         // 手の広がり（相対距離）
+    const shoulder = dist2D(shoulderL, shoulderR); // 肩幅（相対距離）
+    const leg = dist2D(hipL, ankleL) + dist2D(hipR, ankleR); // 両脚合計
 
-    // --- 2. スタイル (Style) の計算 ---
-    const spineMid = { x: (hipL.x + hipR.x) / 2, y: (hipL.y + hipR.y) / 2 }; // 背骨中央（腰）
-    // 角度ベースの姿勢評価: 関節の曲がり具合と開き具合を0..1に集約
-    function angle(a,b,c){
-        const ab = {x:a.x-b.x, y:a.y-b.y};
-        const cb = {x:c.x-b.x, y:c.y-b.y};
-        const dot = ab.x*cb.x + ab.y*cb.y;
-        const nab = Math.hypot(ab.x,ab.y); const ncb = Math.hypot(cb.x,cb.y);
-        const cos = (nab>0 && ncb>0) ? (dot/(nab*ncb)) : 1;
-        const ang = Math.acos(Math.max(-1, Math.min(1, cos))); // 0..π
-        return ang;
-    }
-    // 肘・膝の曲げ: 伸びているほど高評価（角度がπに近い）
-    const leftElbowAng = angle(lm[11], lm[13], lm[15]);
-    const rightElbowAng = angle(lm[12], lm[14], lm[16]);
-    const leftKneeAng = angle(lm[23], lm[25], lm[27]);
-    const rightKneeAng = angle(lm[24], lm[26], lm[28]);
-    function bendScore(theta){
-        // 曲げ優遇: θ=0で1.0, θ=π/2で0.5, θ=πで0.0
-        return clip01(1 - (theta/Math.PI));
-    }
-    const elbowScore = (bendScore(leftElbowAng)+bendScore(rightElbowAng))/2;
-    const kneeScore = (bendScore(leftKneeAng)+bendScore(rightKneeAng))/2;
-    // 開き具合: 肩幅比の腕開き/脚開きを評価（左右手首間と足首間の距離）
-    // v2 は上で定義した2点間距離関数。dist2D の代わりに使用する。
-    const handSpread = v2(lm[15], lm[16]);
-    const footSpread = v2(lm[27], lm[28]);
-    const shoulderWidth = v2(lm[11], lm[12]);
-    const hipWidth = v2(lm[23], lm[24]);
-    const handOpenN = clip01( handSpread / Math.max(shoulderWidth, 1e-6) );
-    const footOpenN = clip01( footSpread / Math.max(hipWidth, 1e-6) );
-    // 体幹直立度: 肩中心→腰中心ベクトルの縦向き具合
-    const shoulderMid = { x:(lm[11].x+lm[12].x)/2, y:(lm[11].y+lm[12].y)/2 };
-    const t = { x: spineMid.x - shoulderMid.x, y: spineMid.y - shoulderMid.y };
-    const tlen = Math.hypot(t.x,t.y);
-    const vy = (tlen>0) ? (t.y/tlen) : 1; // 上向きベクトルとの余弦（縦成分）
-    const upright = clip01( (vy+1)/2 ); // -1..1 -> 0..1
-    // 総合姿勢スコア（係数は経験値で調整可能）
-    const poseN = clip01( 0.35*elbowScore + 0.25*kneeScore + 0.20*handOpenN + 0.10*footOpenN + 0.10*upright );
+    // --- スタイル（ポーズ・表情）計算（既存ロジック簡易版） ---
+    const spineMid = { x: (hipL.x + hipR.x) / 2, y: (hipL.y + hipR.y) / 2 };
+    // 単純なポーズ値：頭→腰距離を正規化（安全な割り算）
+    const poseVal = v2(top, spineMid);
+    const poseN = clip01(poseVal / 0.5);
+    const facePoints = [lp(0), lp(1), lp(2), lp(3), lp(4)]; // 安全な顔点群
+    const face = facePoints.map(p => [p.x, p.y]).flat();
+    const exprN = clip01(std(face) / 0.05);
 
-    // 立ち幅指標（ML用）：足の開き度合いをそのまま使う
-    const stance_w = footOpenN;
-
-    // 関節角度を度数に変換（ML用）
-    const toDeg = (rad) => rad * 180 / Math.PI;
-    const elbowL_deg = toDeg(leftElbowAng);
-    const elbowR_deg = toDeg(rightElbowAng);
-    const kneeL_deg = toDeg(leftKneeAng);
-    const kneeR_deg = toDeg(rightKneeAng);
-    const face = lm.slice(0, 5).map(p => [p.x, p.y]).flat(); // 顔の主要5点の座標
-    const exprN = clip01(std(face) / 0.05); // 表情値（顔の標準偏差 = 顔の動き）
-
-    // 速度(Motion)計算は削除
-
-    // --- 4. 総合戦闘力の計算 ---
-    // 各要素を重み付けして合算 (0〜1)
-    const baseRaw = ( // 体格
-        POWER_CONSTANTS.weightReachInBase * Math.pow(rN, 0.90) +
-        POWER_CONSTANTS.weightShoulderInBase * Math.pow(sN, 0.85) +
-        POWER_CONSTANTS.weightLegInBase * Math.pow(lN, 0.80)
-    );
-    const styleRaw = ( // スタイル
-        POWER_CONSTANTS.weightPoseInStyle * poseN +
-        POWER_CONSTANTS.weightExprInStyle * exprN
-    );
-    let combined = (
-        POWER_CONSTANTS.weightBase * baseRaw +
-        POWER_CONSTANTS.weightStyle * styleRaw
-    );
-
-    // 性別補正 (index.html側で設定された _selectedGender を参照)
-    let gender = (window && window._selectedGender) ? window._selectedGender : 'male';
-    const gmul = POWER_CONSTANTS.genderMultiplier[gender] || 1.0;
-    combined = Math.min(1, combined * gmul); // 補正をかけて1.0でクリップ
-
-    // 基礎点(baseline)からの上乗せ分(span)を計算
-    const span = POWER_CONSTANTS.maxTotal; // 基礎点を廃止し、満点幅をそのまま使用
-    // 各ボーナス項目を計算
-    let base_amount = 0; // 基礎点の上乗せを廃止
-    let pose_amount = span * POWER_CONSTANTS.weightStyle * POWER_CONSTANTS.weightPoseInStyle * poseN;
-    let expr_amount = span * POWER_CONSTANTS.weightStyle * POWER_CONSTANTS.weightExprInStyle * exprN;
-    
-    // 性別補正を各項目にも適用
-    base_amount *= gmul; pose_amount *= gmul; expr_amount *= gmul;
-    
-    let sumParts = base_amount + pose_amount + expr_amount;
-    if (sumParts > span) { // 合計が上乗せ分を超えた場合、スケールダウンする
-        const scale = span / sumParts;
-    base_amount *= scale; pose_amount *= scale; expr_amount *= scale;
-        sumParts = span;
-    }
-    // 基礎点 + 上乗せ分 = 最終戦闘力
-    const total = Math.round(POWER_CONSTANTS.baseline + sumParts);
-
-    // 実身長の概算（任意）
+    // --- 身長[m]/cm の推定 ---
     let height_m = null;
     if (CAMERA_APPROX.enable) {
         try {
             const vfov = (CAMERA_APPROX.vFovDeg || 40) * Math.PI / 180;
             const sceneHeightM = 2 * (CAMERA_APPROX.distanceM || 3.0) * Math.tan(vfov / 2);
-            height_m = sceneHeightM * height;
-        } catch (e) {}
+            // height が 0 のときは sceneHeightM * 0 になるので無効と判断
+            if (height > 1e-6) height_m = sceneHeightM * height;
+        } catch(e) { height_m = null; }
     }
+    // フォールバック：視野高さ=2.0mを仮定（height が小さい場合でも安全化）
+    if (!height_m || !isFinite(height_m) || height_m <= 0.001) {
+        height_m = 2.0 * height;
+    }
+    const height_cm = (isFinite(height_m) && height_m > 0) ? height_m * 100 : NaN; // cm単位（無効なら NaN）
 
-    // 最終的なオブジェクトを返す
-    return {
-        base_power: Math.round(base_amount),
-        pose_bonus: Math.round(pose_amount),
-        expression_bonus: Math.round(expr_amount),
-    // speed_bonus 削除
-        total_power: total,
-        height, // 画面内比率（0〜1）
-        height_m, // 実身長の概算[m]（CAMERA_APPROX.enable=true のとき）
-        reach, shoulder, expression: exprN, pose: poseN, // 生データ（デバッグ表示用）
-        // ML用特徴量（CSVの列と合わせる）
-        reach_norm: rN,
-        shoulder_norm: sN,
-        leg_norm: lN,
-        stance_w,
-        elbowL_deg,
-        elbowR_deg,
-        kneeL_deg,
-        kneeR_deg
-    };
+    // --- 体格（physique）計算（性別依存） ---
+    let gender = (window && window._selectedGender) ? window._selectedGender : 'male';
+    // 基準点と変化量（m単位で扱い） — 体格が総合に支配的にならないように小さめのスケーリングに変更
+    const maleBaseM = 1.708;   // 170.8 cm
+    const femaleBaseM = 1.58;  // 158.0 cm
+    const stepM = 0.01;        // 変化単位（0.01 m = 1 cm）
+    const perStepDelta =2000;// 以前より小さく：1cmあたりの寄与を減らす
+    let physique = 1 ;    // ベースを小さめに（以前200000）
+    // 有効な身長mを使う（無効なら基準値を使って200000にする）
+    const effectiveM = (isFinite(height_m) && height_m > 0) ? height_m : (gender === 'female' ? femaleBaseM : maleBaseM);
+    const baseM = (gender === 'female') ? femaleBaseM : maleBaseM;
+    // 増分ステップ数（0.01m単位）を算出して5000ずつ乗算
+    const steps = Math.round((effectiveM - baseM) / stepM);
+    physique = physique + (steps * perStepDelta);
+    if (!isFinite(physique)) physique = 200000
+
+    // --- 他の内訳（単純スケール） ---
+    // 肩幅・ポーズ・表情・リーチ等の寄与を目立たせる（各スケールを上げる）
+    const shoulder_component = Math.round(shoulder * 5000);      // 例: 0.4 -> ~2000
+    const pose_component = Math.round(poseN * 30000);            // ポーズの影響を大きめに
+    const expr_component = Math.round(exprN * 15000);            // 表情の影響
+    const reach_component = Math.round(reach * 8000);            // リーチ（手の広がり）を追加寄与
+    const leg_component = Math.round(leg * 2000);                // 脚の長さ合算も少し寄与
+
+    // ランダムは小さくして揺らぎだけを残す（1〜2000）
+    const randomComponent = Math.floor(Math.random() * 370001);
+
+    // --- 合算（POWER_CONSTANTS の重みを利用して調整） ---
+    const basePart = physique; // 体格ベース
+    const stylePart = shoulder_component + pose_component + expr_component + reach_component + leg_component;
+    const total = Math.round((basePart * (POWER_CONSTANTS.weightBase || 0.7))
+                   + (stylePart * (POWER_CONSTANTS.weightStyle || 0.3))
+                   + randomComponent);
+
+    // 戻り値（UI更新用）
+    return {
+        base_power: Math.round(physique),           // 体格を base_power として表示
+        pose_bonus: Math.round(pose_component),
+        expression_bonus: Math.round(expr_component),
+        total_power: Math.round(total),
+        height, height_m, reach, shoulder,
+        expression: exprN, pose: poseN,
+        // 内訳（デバッグ表示用）
+        _components: { shoulder_component, expr_component, pose_component, reach_component, leg_component, randomComponent, physique, height_cm, gender }
+    };
 }
 
 /**
