@@ -60,7 +60,7 @@ body {
     -webkit-text-stroke: 1px black;
     border: none;
     border-radius: 0.5em;
-    box-shadow: 0 0 12px #00ff41, 0 0 32px #0fffc1;
+
     font-weight: bold;
     font-size: 1.2rem;
     padding: 0.7em 2.2em;
@@ -73,19 +73,19 @@ body {
 .btn:hover, .hud-button:hover {
     color: #fff;
     background: #101820;
-    box-shadow: 0 0 24px #00ff41, 0 0 48px #0fffc1;
+ 
     transform: scale(1.06);
 }
 .btn.btn-secondary {
     background: linear-gradient(90deg, #f9c107 0%, #ff9900 100%);
     color: #f5f5f5;
     -webkit-text-stroke: 1px black;
-    box-shadow: 0 0 8px #00ff41;
+  
 }
 .btn.btn-secondary:hover {
     background: #101820;
     color: #fff;
-    box-shadow: 0 0 18px #00ff41;
+   
 }
 
 /* --- カード（.card）について（詳細） ---
@@ -192,13 +192,7 @@ body {
     aspect-ratio: 16/9;
     margin: 40px auto 0 auto;
     border: 4px solid #00ff41;
-    box-shadow:
-        0 0 40px 8px #00ff41,
-        0 0 80px 16px #00ff41,
-        0 0 0 8px rgba(0,255,65,0.2),
-        0 0 60px 0 #00ff41,
-        0 0 25px rgba(0, 255, 65, 0.5),
-        inset 0 0 15px rgba(0, 255, 65, 0.3);
+
     background-color: #000;
     position: relative;
     overflow: hidden;

@@ -402,25 +402,33 @@ btnStart && btnStart.addEventListener('click', () => {
         };
     }
 
-    // 10秒後に実行
-    measureTimeout = setTimeout(() => {
-        try {
-            // 10秒経過時点の <canvas> の内容を画像(jpeg)として取得
-            const dataUrl = canvasEl.toDataURL('image/jpeg');
-            lastSnapshotDataUrl = dataUrl; // グローバル変数に保存
-            // 10秒経過時点の戦闘力(lastCombatStats)を、このタイミングで確定させる
-            snapshotCombatStats = lastCombatStats ? { ...lastCombatStats } : null;
-            measurementLocked = true; // 以降は戦闘力を更新しない
-        } catch(e){}
-        
-        // 名前入力モーダルを表示
-        nameModal.classList.remove('hidden');
-        inputPlayerName.value = '';
-        inputPlayerName.focus();
-        // STARTボタンを再度有効化（キャンセルされた時用）
-        btnStart.disabled = false;
-        btnStart.textContent = 'START';
-    }, 10000); // 10秒
+   // 10秒後に実行
+measureTimeout = setTimeout(() => {
+    try {
+        // 10秒経過時点の <canvas> の内容を画像(jpeg)として取得
+        const dataUrl = canvasEl.toDataURL('image/jpeg');
+        lastSnapshotDataUrl = dataUrl; // グローバル変数に保存
+        // 10秒経過時点の戦闘力(lastCombatStats)を、このタイミングで確定させる
+        snapshotCombatStats = lastCombatStats ? { ...lastCombatStats } : null;
+        measurementLocked = true; // 以降は戦闘力を更新しない
+
+        // ★ 戦闘力を名前入力モーダルに表示
+        const totalPowerEl = document.getElementById('modal-total-power');
+        if (snapshotCombatStats && snapshotCombatStats.total_power) {
+            totalPowerEl.textContent = snapshotCombatStats.total_power.toLocaleString();
+        } else {
+            totalPowerEl.textContent = '0';
+        }
+    } catch(e) {}
+
+    // 名前入力モーダルを表示
+    nameModal.classList.remove('hidden');
+    inputPlayerName.value = '';
+    inputPlayerName.focus();
+    // STARTボタンを再度有効化（キャンセルされた時用）
+    btnStart.disabled = false;
+    btnStart.textContent = 'START';
+}, 10000); // 10秒
 });
 
 // EXITボタン: すべて停止して index.html に戻る
