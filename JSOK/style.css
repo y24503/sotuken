@@ -304,6 +304,25 @@ body {
     right: 0;
 }
 
+/* --- 大きな画面向けのUI拡大設定 ---
+   画面サイズに対してUIが小さく見える問題への対応として、
+   PCなどの横幅が広い環境(min-width:1024px)では
+   タイトルや説明カード、汎用ボタンのみを拡大します。
+   測定画面(スカウター/HUD)は元のサイズを維持します。 */
+@media (min-width: 1024px) {
+    /* カード(タイトル/説明/選択画面など)を広く大きく */
+    .card {
+        max-width: 900px;
+        padding: 3em 3em;
+    }
+
+    /* 汎用ボタンのみ拡大（測定HUDボタンはそのまま） */
+    .btn {
+        font-size: 1.4rem;
+        padding: 0.9em 2.8em;
+    }
+}
+
 /* モバイル向けにサイズ調整（小画面での重なり回避） */
 @media (max-width: 640px) {
   .hud-button { padding: 6px 18px; font-size: 0.95rem; }
