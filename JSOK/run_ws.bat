@@ -55,12 +55,16 @@ goto START_FG
 echo Starting server in a new window (background)...
 start "Demo Node Server" cmd /c set PORT=%APP_PORT% ^& node server.js
 echo Launched. Visit http://localhost:%APP_PORT%/ (or your LAN IP) and /api/health
+echo Opening browser to http://localhost:%APP_PORT%/ ...
+start "" "http://localhost:%APP_PORT%/"
 endlocal
 goto :eof
 
 :START_FG
 echo Starting server in current window (Ctrl+C to stop)...
 set PORT=%APP_PORT%
+echo Opening browser to http://localhost:%APP_PORT%/ ...
+start "" "http://localhost:%APP_PORT%/"
 node server.js
 set EXITCODE=%ERRORLEVEL%
 echo Node exited with code %EXITCODE%.
