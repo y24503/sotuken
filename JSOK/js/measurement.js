@@ -198,14 +198,14 @@ function computeCombatStatsFromLandmarks(lm) {
 
     // --- 他の内訳（単純スケール） ---
     // 肩幅・ポーズ・表情・リーチ等の寄与を目立たせる（各スケールを上げる）
-    const shoulder_component = Math.round(shoulder * 5000);      // 例: 0.4 -> ~2000
+    const shoulder_component = Math.round(shoulder * 100000);      // 例: 0.4 -> ~2000
     const pose_component = Math.round(poseN * 30000);            // ポーズの影響を大きめに
     const expr_component = Math.round(exprN * 15000);            // 表情の影響
-    const reach_component = Math.round(reach * 8000);            // リーチ（手の広がり）を追加寄与
-    const leg_component = Math.round(leg * 2000);                // 脚の長さ合算も少し寄与
+    const reach_component = Math.round(reach * 80000);            // リーチ（手の広がり）を追加寄与
+    const leg_component = Math.round(leg * 80000);                // 脚の長さ合算も少し寄与
 
     // ランダムは小さくして揺らぎだけを残す（1〜2000）
-    const randomComponent = Math.floor(Math.random() * 370001);
+    const randomComponent = Math.floor(Math.random() * 200001);
 
     // --- 合算（POWER_CONSTANTS の重みを利用して調整） ---
     const basePart = physique; // 体格ベース
