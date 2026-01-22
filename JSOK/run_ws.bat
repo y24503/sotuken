@@ -5,7 +5,6 @@ title Demo Node Server
 echo === Demo Node server start ===
 echo Script dir: %SCRIPT_DIR%
 
-REM Check Node.js and npm availability for any user account
 where node >nul 2>nul
 if errorlevel 1 (
 	echo [ERROR] Node.js が見つかりません。 https://nodejs.org/ からインストールし、PATHを設定してください。
@@ -21,11 +20,9 @@ if errorlevel 1 (
 	exit /b 1
 )
 
-REM Go to node folder
 if not exist "%SCRIPT_DIR%node" goto NO_NODE_DIR
 cd /d "%SCRIPT_DIR%node"
 
-REM Install dependencies if missing
 if not exist "node_modules" goto INSTALL_DEPS
 goto AFTER_INSTALL
 
@@ -35,19 +32,15 @@ call npm install
 if errorlevel 1 goto NPM_FAIL
 
 :AFTER_INSTALL
-REM HTTPS 生成を行わず、HTTP のみで起動します。
 
-REM Allow overriding port via first argument (e.g. run_ws.bat 8080) else default 8080
 set "APP_PORT=%~1"
 if "%APP_PORT%"=="" set "APP_PORT=8888"
 echo Using port %APP_PORT%
 
-REM Free target port if already in use (silent)
 echo Ensuring port %APP_PORT% is free...
 powershell -NoLogo -NoProfile -Command "Get-NetTCPConnection -LocalPort %APP_PORT% -State Listen -ErrorAction SilentlyContinue | ForEach-Object { try { Stop-Process -Id $_.OwningProcess -Force } catch {} }" >nul 2>&1
 timeout /t 1 >nul
 
-REM If second argument is bg then background start
 if /I "%~2"=="bg" goto START_BG
 goto START_FG
 

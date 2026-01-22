@@ -1,12 +1,10 @@
 @echo off
 setlocal
 
-rem スクリプトのあるフォルダに移動
 cd /d "%~dp0"
 
 set "POSE_SCRIPT=mediapipe\pose\get_pose.ps1"
 
-rem PowerShell スクリプトの存在チェック
 if not exist "%POSE_SCRIPT%" (
   echo [ERROR] "%POSE_SCRIPT%" が見つかりません。
   echo mediapipe/pose フォルダに get_pose.ps1 があるか確認してください。
@@ -31,6 +29,15 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo.
 echo ==== ダウンロードが完了しました ==== 
-echo ブラウザを再読み込みして、最新の pose.js が読み込まれていることを確認してください。
-echo 何かキーを押すとこのウィンドウを閉じます。
-pause
+echo 続けてサーバー(run_ws.bat)を起動します...
+echo.
+
+if exist "%~dp0run_ws.bat" (
+  call "%~dp0run_ws.bat"
+) else (
+  echo [WARNING] run_ws.bat が見つかりませんでした。サーバーは起動していません。
+  echo JSOK フォルダ内の run_ws.bat を確認してください。
+  pause
+)
+
+exit /b %ERRORLEVEL%
