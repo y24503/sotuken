@@ -637,7 +637,7 @@ try { window.battleState = battleState; } catch(e){}
             createRippleEffect(event, this);
 
             // 1回ごとの基礎ダメージ（1000〜1500の乱数）
-	            const baseDamage = 1000 + Math.floor(Math.random() * 501); // 1000〜1500
+	            const baseDamage = 1000 + Math.floor(Math.random() * 1001); // 1000〜1500
             let bonus = 0;
 
             if (phase === 1) {
