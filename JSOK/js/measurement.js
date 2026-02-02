@@ -14,6 +14,8 @@ const statReach = document.getElementById('stat-reach'); // リーチ (推定値
 const statShoulder = document.getElementById('stat-shoulder'); // 肩幅 (推定値)
 const statExpression = document.getElementById('stat-expression'); // 表情 (推定値)
 const statPose = document.getElementById('stat-pose'); // ポーズ (推定値)
+// 追加: 脚長表示要素
+const statLeg = document.getElementById('stat-leg'); // 脚長 (推定値)
 
 const nameModal = document.getElementById('name-modal'); // 名前入力モーダル
 const inputPlayerName = document.getElementById('input-player-name'); // 名前入力フィールド
@@ -66,7 +68,7 @@ function drawLandmarks(ctx, lm) {
         const px = (flipLandmarksHorizontally ? (1 - p.x) : p.x) * w;
         const py = p.y * h;
         ctx.beginPath();
-        ctx.arc(px, py, 4, 0, Math.PI*2);
+        ctx.arc(px, py, 2, 0, Math.PI*2);
         ctx.fill();
     });
     ctx.restore();
@@ -122,7 +124,7 @@ function computeCombatStatsFromLandmarks(lm) {
     if (!lm || lm.length < 33) {
         return {
             base_power: 0, pose_bonus: 0, expression_bonus: 0, total_power: 0,
-            height: 0, height_m: null, reach: 0, shoulder: 0, expression: 0, pose: 0
+            height: 0, height_m: null, reach: 0, shoulder: 0, expression: 0, pose: 0, leg: 0
         };
     }
 
@@ -151,32 +153,78 @@ function computeCombatStatsFromLandmarks(lm) {
     const footY = footCandidates.length ? Math.max(...footCandidates.map(p => p.y)) : ((ankleL.y + ankleR.y) / 2 || top.y);
     const height = Math.max(0, Math.min(1, footY - headY)); // 画面内比率
 
-    const reach = dist2D(wristL, wristR);         // 手の広がり（相対距離）
+    // 変更: リーチを左右の「肩→手首」距離の合計に変更（脚長と同様に左右合算）。
+    const reachL = dist2D(shoulderL, wristL);    // 左腕の長さ相当
+    const reachR = dist2D(shoulderR, wristR);    // 右腕の長さ相当
+    const reach = reachL + reachR;               // 両腕合計（相対距離）
     const shoulder = dist2D(shoulderL, shoulderR); // 肩幅（相対距離）
     const leg = dist2D(hipL, ankleL) + dist2D(hipR, ankleR); // 両脚合計
+// --- 新・ポーズ（Pose）：手足の開放度と広がり ---
+    
+    // 1. 体の「中心」と「基準サイズ」を決める
+    const _shoulderMid = { x: (shoulderL.x + shoulderR.x)/2, y: (shoulderL.y + shoulderR.y)/2 };
+    const _hipMid = { x: (hipL.x + hipR.x)/2, y: (hipL.y + hipR.y)/2 };
+    const _torsoLen = Math.hypot(_shoulderMid.x - _hipMid.x, _shoulderMid.y - _hipMid.y);
+    const _baseScale = (_torsoLen > 0.01) ? _torsoLen : 1.0; // ゼロ除算防止
 
-    // --- スタイル（ポーズ・表情）計算（既存ロジック簡易版） ---
-    const spineMid = { x: (hipL.x + hipR.x) / 2, y: (hipL.y + hipR.y) / 2 };
-    // 単純なポーズ値：頭→腰距離を正規化（安全な割り算）
-    const poseVal = v2(top, spineMid);
-    const poseN = clip01(poseVal / 0.5);
-   // --- 改良版：表情（叫び）計算 ---
-    // 目の幅(eyeW)に対する、目と口の縦距離(faceH)の比率を測る
-    const _eL = lm[2] || {x:0,y:0}, _eR = lm[5] || {x:0,y:0}; // 目
-    const _mL = lm[9] || {x:0,y:0}, _mR = lm[10] || {x:0,y:0}; // 口
-    
-    // 目の幅 (カメラ距離の基準になる)
-    const _eyeW = Math.hypot(_eL.x - _eR.x, _eL.y - _eR.y);
-    // 目と口の縦の距離 (叫ぶとここが広がる)
-    const _faceH = Math.abs(((_mL.y + _mR.y)/2) - ((_eL.y + _eR.y)/2));
-    
-    // 比率を計算 (目の幅が極端に小さい場合は0)
-    let _ratio = (_eyeW > 0.005) ? (_faceH / _eyeW) : 0;
-    
-    // 判定基準: 0.8(真顔) 〜 1.4(叫びMAX) を 0.0〜1.0 に変換
-    // これが exprN (0.0〜1.0) になります
-    const exprN = Math.max(0, Math.min((_ratio - 0.8) / (1.4 - 0.8), 1.0));
+    // 2. 腕の広がり（胴体に対する比率）
+    const _armDistL = Math.hypot(wristL.x - shoulderL.x, wristL.y - shoulderL.y);
+    const _armDistR = Math.hypot(wristR.x - shoulderR.x, wristR.y - shoulderR.y);
+    const _armOpenness = (_armDistL + _armDistR) / _baseScale; 
 
+    // 3. 足の広がり
+    const _legSpread = Math.hypot(ankleL.x - ankleR.x, ankleL.y - ankleR.y);
+    const _legOpenness = _legSpread / _baseScale;
+
+    // 4. 高さボーナス（手が肩より上にあるか）
+    let _handHeightBonus = 0;
+    if (wristL.y < shoulderL.y) _handHeightBonus += 0.5;
+    if (wristR.y < shoulderR.y) _handHeightBonus += 0.5;
+
+    // 5. 総合スコア計算
+    const _rawPoseScore = (_armOpenness * 1.0) + (_legOpenness * 0.8) + (_handHeightBonus * 0.3);
+
+    // 6. 正規化（ここが poseN になります）
+    // 基準値：2.0(棒立ち) 〜 3.5(派手なポーズ)
+    const poseN = Math.max(0, Math.min((_rawPoseScore - 2.0) / (3.5 - 2.0), 1.0));
+ // 1. 座標取得
+ const _eL = lm[2] || {x:0,y:0}; // 左目
+ const _eR = lm[5] || {x:0,y:0}; // 右目
+ const _mL = lm[9] || {x:0,y:0}; // 口の左端
+ const _mR = lm[10] || {x:0,y:0}; // 口の右端
+
+ // 2. 基準：目の幅（カメラ距離の補正用）
+ const _eyeW = Math.hypot(_eL.x - _eR.x, _eL.y - _eR.y);
+ 
+ // エラー回避（遠すぎる、または検出ミス）
+ let _vScore = 0; // 縦のスコア
+ let _hScore = 0; // 横のスコア
+
+ if (_eyeW > 0.005) {
+     // --- A. 縦の判定（叫び） ---
+     // 目と口の縦距離
+     const _vertDist = Math.abs(((_mL.y + _mR.y)/2) - ((_eL.y + _eR.y)/2));
+     const _vRatio = _vertDist / _eyeW;
+     
+     // 縦の閾値（Threshold）: 0.7(真顔) 〜 1.2(叫び)
+     _vScore = (_vRatio - 0.7) / (1.2 - 0.7);
+
+     // --- B. 横の判定（食いしばり・ニカッ） ---
+     // 口の横幅
+     const _horizDist = Math.hypot(_mL.x - _mR.x, _mL.y - _mR.y);
+     const _hRatio = _horizDist / _eyeW;
+
+     // 横の閾値（Threshold）: 0.4(真顔) 〜 0.65(全開)
+     _hScore = (_hRatio - 0.40) / (0.65 - 0.40);
+ }
+
+ // 3. 統合：縦と横、どっちか「すごい方」を採用する
+ // 両方を0.0〜1.0の範囲に収めてから比較
+ const _vFinal = Math.max(0, Math.min(_vScore, 1.0));
+ const _hFinal = Math.max(0, Math.min(_hScore, 1.0));
+
+ // 大きい方を採用（叫んでも、笑ってもOK）
+ const exprN = Math.max(_vFinal, _hFinal);
     // --- 身長[m]/cm の推定 ---
     let height_m = null;
     if (CAMERA_APPROX.enable) {
@@ -195,19 +243,38 @@ function computeCombatStatsFromLandmarks(lm) {
 
     // --- 体格（physique）計算（性別依存） ---
     let gender = (window && window._selectedGender) ? window._selectedGender : 'male';
-    // 基準点と変化量（m単位で扱い） — 体格が総合に支配的にならないように小さめのスケーリングに変更
+    
     const maleBaseM = 1.708;   // 170.8 cm
     const femaleBaseM = 1.58;  // 158.0 cm
-    const stepM = 0.01;        // 変化単位（0.01 m = 1 cm）
-    const perStepDelta =1000;// 以前より小さく：1cmあたりの寄与を減らす
-    let physique = 1 ;    // ベースを小さめに（以前200000）
-    // 有効な身長mを使う（無効なら基準値を使って200000にする）
+    const stepM = 0.01;        // 1 cm単位
+    const perStepDelta = 2000; // 基本の変動値（1000点）
+    
+    let physique = 1; // 基礎点
+
+    // 身長mが取れていれば使う。取れていなければ平均値を使う
     const effectiveM = (isFinite(height_m) && height_m > 0) ? height_m : (gender === 'female' ? femaleBaseM : maleBaseM);
     const baseM = (gender === 'female') ? femaleBaseM : maleBaseM;
-    // 増分ステップ数（0.01m単位）を算出して5000ずつ乗算
+
+    // 1. 平均との差分（ステップ数）を計算
+    // プラスなら平均より高い、マイナスなら平均より低い
     const steps = Math.round((effectiveM - baseM) / stepM);
-    physique = physique + (steps * perStepDelta);
-    if (!isFinite(physique)) physique = 100000
+
+    // 2. 加点・減点の計算（ここが変更点）
+    let physiqueBonus = 0;
+
+    if (steps >= 0) {
+        // 平均以上：そのまま1000点ずつ加点
+        physiqueBonus = steps * perStepDelta;
+    } else {
+        // 平均未満：減点幅を半分（500点）にする
+        // stepsがマイナスなので、足し算すれば自然に減点になります
+        physiqueBonus = steps * (perStepDelta / 2); 
+    }
+
+    // 3. 最終的な体格スコア
+    physique = physique + physiqueBonus;
+
+    if (!isFinite(physique)) physique = 0;
 
     // --- 他の内訳（単純スケール） ---
     // 肩幅・ポーズ・表情・リーチ等の寄与を目立たせる（各スケールを上げる）
@@ -223,8 +290,7 @@ function computeCombatStatsFromLandmarks(lm) {
     // --- 合算（POWER_CONSTANTS の重みを利用して調整） ---
     const heightPart = physique; // 体格ベース
     const stylePart = shoulder_component + pose_component + expr_component + reach_component + leg_component;
-    const total = Math.round(heightPart 
-    + stylePart + randomComponent);
+    const total = Math.round(heightPart + stylePart + randomComponent);
 
     // 戻り値（UI更新用）
     return {
@@ -232,8 +298,9 @@ function computeCombatStatsFromLandmarks(lm) {
         pose_bonus: Math.round(pose_component),
         expression_bonus: Math.round(expr_component),
         total_power: Math.round(total),
-        height, height_m, reach, shoulder,
+        height, height_m, reach, shoulder,  // 既存
         expression: exprN, pose: poseN,
+        leg, // 追加: 脚長を返す
         // 内訳（デバッグ表示用）
         _components: { shoulder_component, expr_component, pose_component, reach_component, leg_component, randomComponent, physique, height_cm, gender }
     };
@@ -262,6 +329,8 @@ function updateStats(stats) {
     } catch(e){}
     try { statReach.textContent = stats.reach ? stats.reach.toFixed(2) : '-'; } catch(e){}
     try { statShoulder.textContent = stats.shoulder ? stats.shoulder.toFixed(2) : '-'; } catch(e){}
+    // 追加: 脚長表示（reach と同様の表示形式）
+    try { statLeg.textContent = stats.leg ? stats.leg.toFixed(2) : '-'; } catch(e){}
     try { statExpression.textContent = stats.expression ? stats.expression.toFixed(2) : '-'; } catch(e){}
     try { statPose.textContent = stats.pose ? stats.pose.toFixed(2) : '-'; } catch(e){}
 }

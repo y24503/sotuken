@@ -64,7 +64,7 @@ function drawLandmarks(ctx, lm) {
         const px = (flipLandmarksHorizontally ? (1 - p.x) : p.x) * w;
         const py = p.y * h;
         ctx.beginPath();
-        ctx.arc(px, py, 4, 0, Math.PI*2);
+        ctx.arc(px, py, 2, 0, Math.PI*2);
         ctx.fill();
     });
     ctx.restore();
