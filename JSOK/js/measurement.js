@@ -160,9 +160,22 @@ function computeCombatStatsFromLandmarks(lm) {
     // 単純なポーズ値：頭→腰距離を正規化（安全な割り算）
     const poseVal = v2(top, spineMid);
     const poseN = clip01(poseVal / 0.5);
-    const facePoints = [lp(0), lp(1), lp(2), lp(3), lp(4)]; // 安全な顔点群
-    const face = facePoints.map(p => [p.x, p.y]).flat();
-    const exprN = clip01(std(face) / 0.05);
+   // --- 改良版：表情（叫び）計算 ---
+    // 目の幅(eyeW)に対する、目と口の縦距離(faceH)の比率を測る
+    const _eL = lm[2] || {x:0,y:0}, _eR = lm[5] || {x:0,y:0}; // 目
+    const _mL = lm[9] || {x:0,y:0}, _mR = lm[10] || {x:0,y:0}; // 口
+    
+    // 目の幅 (カメラ距離の基準になる)
+    const _eyeW = Math.hypot(_eL.x - _eR.x, _eL.y - _eR.y);
+    // 目と口の縦の距離 (叫ぶとここが広がる)
+    const _faceH = Math.abs(((_mL.y + _mR.y)/2) - ((_eL.y + _eR.y)/2));
+    
+    // 比率を計算 (目の幅が極端に小さい場合は0)
+    let _ratio = (_eyeW > 0.005) ? (_faceH / _eyeW) : 0;
+    
+    // 判定基準: 0.8(真顔) 〜 1.4(叫びMAX) を 0.0〜1.0 に変換
+    // これが exprN (0.0〜1.0) になります
+    const exprN = Math.max(0, Math.min((_ratio - 0.8) / (1.4 - 0.8), 1.0));
 
     // --- 身長[m]/cm の推定 ---
     let height_m = null;
@@ -186,7 +199,7 @@ function computeCombatStatsFromLandmarks(lm) {
     const maleBaseM = 1.708;   // 170.8 cm
     const femaleBaseM = 1.58;  // 158.0 cm
     const stepM = 0.01;        // 変化単位（0.01 m = 1 cm）
-    const perStepDelta =2000;// 以前より小さく：1cmあたりの寄与を減らす
+    const perStepDelta =1000;// 以前より小さく：1cmあたりの寄与を減らす
     let physique = 1 ;    // ベースを小さめに（以前200000）
     // 有効な身長mを使う（無効なら基準値を使って200000にする）
     const effectiveM = (isFinite(height_m) && height_m > 0) ? height_m : (gender === 'female' ? femaleBaseM : maleBaseM);
@@ -194,25 +207,24 @@ function computeCombatStatsFromLandmarks(lm) {
     // 増分ステップ数（0.01m単位）を算出して5000ずつ乗算
     const steps = Math.round((effectiveM - baseM) / stepM);
     physique = physique + (steps * perStepDelta);
-    if (!isFinite(physique)) physique = 200000
+    if (!isFinite(physique)) physique = 100000
 
     // --- 他の内訳（単純スケール） ---
     // 肩幅・ポーズ・表情・リーチ等の寄与を目立たせる（各スケールを上げる）
-    const shoulder_component = Math.round(shoulder * 100000);      // 例: 0.4 -> ~2000
-    const pose_component = Math.round(poseN * 30000);            // ポーズの影響を大きめに
-    const expr_component = Math.round(exprN * 15000);            // 表情の影響
-    const reach_component = Math.round(reach * 80000);            // リーチ（手の広がり）を追加寄与
-    const leg_component = Math.round(leg * 80000);                // 脚の長さ合算も少し寄与
+    const shoulder_component = Math.round(shoulder * 70000);      // 例: 0.4 -> ~2000
+    const pose_component = Math.round(poseN * 80000);            // ポーズの影響を大きめに
+    const expr_component = Math.round(exprN * 80000);            // 表情の影響
+    const reach_component = Math.round(reach * 50000);            // リーチ（手の広がり）を追加寄与
+    const leg_component = Math.round(leg * 50000);                // 脚の長さ合算も少し寄与
 
     // ランダムは小さくして揺らぎだけを残す（1〜2000）
-    const randomComponent = Math.floor(Math.random() * 200001);
+    const randomComponent = Math.floor(Math.random() * 150001);
 
     // --- 合算（POWER_CONSTANTS の重みを利用して調整） ---
-    const basePart = physique; // 体格ベース
+    const heightPart = physique; // 体格ベース
     const stylePart = shoulder_component + pose_component + expr_component + reach_component + leg_component;
-    const total = Math.round((basePart * (POWER_CONSTANTS.weightBase || 0.7))
-                   + (stylePart * (POWER_CONSTANTS.weightStyle || 0.3))
-                   + randomComponent);
+    const total = Math.round(heightPart 
+    + stylePart + randomComponent);
 
     // 戻り値（UI更新用）
     return {
