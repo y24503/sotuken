@@ -244,7 +244,7 @@ function computeCombatStatsFromLandmarks(lm) {
     // --- 体格（physique）計算（性別依存） ---
     let gender = (window && window._selectedGender) ? window._selectedGender : 'male';
     
-    const maleBaseM = 1.708;   // 170.8 cm
+    const maleBaseM = 1.71;   // 170.8 cm
     const femaleBaseM = 1.58;  // 158.0 cm
     const stepM = 0.01;        // 1 cm単位
     const perStepDelta = 2000; // 基本の変動値（1000点）
